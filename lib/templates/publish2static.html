@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+<head>
+    <META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <link rel="stylesheet" type="text/css" href="/go/css/build_common.css" />
+    <link rel="stylesheet" type="text/css" href="/go/css/build_detail.css" />
+    <style>
+        * {font-size:12px}
+        table {border-collapse: collapse; border-spacing: 0;}
+        h2{ padding:2pt;font-size:18px;border-bottom: rgb(44, 86, 86) 2px dashed;border-left: rgb(44, 86, 86) 3px solid;}
+        .modifications th.highlight-true{text-align:left;padding-top:1.5em;font-weight:normal;font-style:normal}
+        .modifications tbody{border-bottom:1px dotted #BEBEBE}
+        .modifications td.modified{padding-left:20px}
+        .modifications td.error{color:red}
+        pre.error{background: #ffff66;padding: 10px;color: red;word-wrap: break-word;}
+    </style>
+</head>
+<body>
+    <%if(typeof toperr != 'undefined'){%>
+    <pre class="error"><%=toperr%></pre>
+    <%}%>
+    
+    <table class="modifications">
+        <thead>
+          <tr>
+            <th align=left colspan=2>相关文件下载：
+              <a href="<%=tarLink%>">HTML文件包</a>
+            </th>
+          </tr>
+        </thead>
+    </table>
+    
+    <%if(typeof omad != 'undefined'){%>
+    <table id="build-peroperties-table">
+      <tr class="table-top"><th colspan=3>云部署</th></tr>
+      <%$$.each(omad.results, function(result){%>
+      <tr>
+        <td><%=result.desc%>(<%=result.paramStr%>)</td>
+        <td><%=result.svnver%></td>
+        <td><%=result.msg%></td>
+      </tr>
+      <%})%>
+    </table>
+    <%}%>
+    
+    <%if(typeof errors != 'undefined'){%>
+    <table class="modifications">
+      <%$$.each(errors, function(info){%>
+      <tr>
+        <td class='highlight-true'><%=info.url%></td>
+        <td class='modified error'>
+          <%if(!info.msgs||!info.msgs.length){%>通过<%}else{%>
+          <%$$.each(info.msgs, function(msg){%><span class='modified_file'><%=msg%></span><br/><%})%>
+          <%}%>
+        </td>
+      </tr>
+      <%})%>
+    </table>
+    <%}%>
+    
+    <%if(typeof warnings != 'undefined'){%>
+    <table class="modifications">
+      <%$$.each(warnings, function(info){%>
+      <tr>
+        <td class='highlight-true'><%=info.url%></td>
+        <td class='modified'>
+          <%if(!info.msgs||!info.msgs.length){%>通过<%}else{%>
+          <%$$.each(info.msgs, function(msg){%><span class='modified_file'><%=msg%></span><br/><%})%>
+          <%}%>
+        </td>
+      </tr>
+      <%})%>
+    </table>
+    <%}%>
+</body>
+</html>

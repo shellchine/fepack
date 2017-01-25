@@ -1,0 +1,16 @@
+<script>
+function toggleSubRows(td){
+  td.className = td.className ? "" : "closed";
+  var showhide = td.className ? "none" : "block";
+  var tr = td.parentNode;
+  var subrow = tr;
+  while(subrow = subrow.nextSibling){
+    if(subrow.nodeType == 1 && subrow.tagName.toLowerCase() == 'tr'){
+       if(subrow.className != "subrow")break;
+       subrow.style.display = showhide;
+    }
+  }
+}
+</script>
+</body>
+</html>

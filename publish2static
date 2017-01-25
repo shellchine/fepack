@@ -1,0 +1,360 @@
+#!/usr/local/bin/node --harmony
+global.exitERR = function(err, warn){
+    var stack = util ? util.stack().join("\n    ") : "";
+    if(err) {
+        failed = 1;
+        err = err.replace(new RegExp(vc.base, 'g'), '');
+        if (stack) {
+            err = err.trim();
+            err += "\n    "+stack;
+        }
+        console.log("[publish2static] ERROR: "+err+"\n");
+        errorArr.push("[publish2static] "+err);
+    }
+    if(warn) {
+        warn = warn.replace(new RegExp(vc.base, 'g'), '');
+        if (stack) {
+            warn = warn.trim();
+            warn += "\n    "+stack;
+        }
+        console.log("[publish2static] WARN: "+warn+"\n");
+        errorArr.push("[publish2static] "+warn);
+    }
+    return err || warn;
+}
+var errorArr = [];
+var fs = require('fs');
+var request = require('request');
+var iconv = require('iconv-lite');
+var path = require('path');
+var $$ = require('./lib/bowlder');
+var util = require("./lib/util4go");
+var conf = util.conf;
+var execSync = util.execSync;
+var ENV = process.env;
+var stage = ENV.GO_STAGE_NAME;
+var label = ENV.GO_PIPELINE_LABEL || 0;
+var svnver = ENV.GO_REVISION || 1;
+var project = ENV.GO_PIPELINE_NAME;
+var log = util.log;
+var cloudEnv = "omadDev";
+var vc = util.vc;
+//相对工作目录读写
+var pwd = ENV.PWD;
+var read = util.read;
+var write = util.write;
+var readWork = util.readWork;
+var writeWork = util.writeWork;
+//代码检查
+var lintUtils = $$.map(conf.lint, arr=>$$.map(name=>{
+    return require("./lintUtil/" + name);
+}));
+//数据目录
+var infoDir = util.infoDir;
+var Reporter = require("./lib/reporter");
+var reporter = util.reporter = new Reporter("publish2static", `${infoDir}/dev.html`);
+//备份目录
+var backupDir = util.backupDir;
+//临时目录
+var tmpDir = util.tmpDir;
+var htmlDir = util.getFolder(`${util.distDir}/html4dev`, true);
+var readHtml = read.bind(null, htmlDir);
+var writeHtml = write.bind(null, htmlDir);
+var colDir = util.getFolder(`${tmpDir}/html4col`, true);
+var readCol = read.bind(null, colDir);
+var writeCol = write.bind(null, colDir);
+var incDir = `${tmpDir}/inc_dev`;
+var projectJson = util.projectJson;
+var collectorRE = /bowlder.jssddd/;
+
+var distUtils = {};
+$$.each(conf.devDist, name=>{
+    distUtils[name] = require("./distUtil/" + name);
+});
+
+var failed = 0;
+
+if(!/devQA/i.test(stage)){
+    if(vc.publish.dev){ //发布未压缩版
+        vc.publish.dev(svnver, vc.cdnfix+vc.path);
+    }
+    log("HTML例行检查", 2, 1);
+    util.lsr(".", /\.s?html?$/).forEach(file => {
+        util.stack(["出错文件: "+file]);
+        if(/^\.\/modules|^\.\/goscript/.test(file)) { //忽略goscript目录
+            return;
+        }
+        file = file.trim();
+        var base = file.replace(/.*\//, '');
+        if (/^\./.test(base)) {   //忽略隐藏文件
+            return;
+        }
+        log(`Validating ${file}: `);
+        var fatal = validHtml(file);
+        if (fatal == '') {
+            console.log("passed.");
+        } else {
+            failed = 1;
+            console.log("failed.");
+            global.exitERR(fatal);
+        }
+    });
+    util.stack([]);
+    
+    log("CSS例行检查", 2, 1);
+    util.lsr(".", /\.css$/).forEach(file => {
+        file = file.trim();
+        util.stack(["出错文件: "+file]);
+        var base = file.replace(/.*\//, '');
+        if (/^(\.|inventory)/.test(base)) {   //忽略隐藏文件
+            return;
+        }
+        log(`Validating ${file}: `);
+        var fatal = validCss(file);
+        if (fatal == '') {
+            console.log("passed.");
+        } else {
+            failed = 1;
+            console.log("failed.");
+            global.exitERR(fatal);
+        }
+    });
+    util.stack([]);
+}
+
+util.printTime();
+
+util.wander(function(dir){
+    return util.isValidDir(dir);
+}, function(file, base){
+    var flag = util.isValidFile(base);
+    if (flag == 9) {
+        cpHtml(file, base);
+    }
+}, /^(__|\.|goscript|_backup)/);
+
+//publish to static.f2e.netease.com
+if(!/devQA/i.test(stage)){
+
+    // 6. 扩展相对路径(仅后端项目)
+    if (util.backendID || projectJson[cloudEnv] || ENV[cloudEnv]) {
+        log(`处理${htmlDir}目录(parseSSI)`, 2, 1);
+        parseSSI(htmlDir);     //内联所有外部ssi
+        //扩充相对路径，默认基于项目根目录
+        incparse(htmlDir);
+    }
+
+    if (global.collectHtmls && global.collectHtmls.length >= 0) {
+        var collectHtmls = global.collectHtmls.join(", ");
+        console.log("收集页面: "+collectHtmls);
+        require("util/collect_static");
+    }else{
+        fs.rmdir(`${util.tmpDir}/inc_col`);
+        fs.rmdir(`${util.tmpDir}/collect_dev`);
+        fs.rmdir(`${util.tmpDir}/htmldir4col`);
+    }
+
+}
+
+var rDir = util.rsyncDir.static;
+// rsync同步到后端服务器(非云主机)
+if (util.backendID || projectJson[cloudEnv] || ENV[cloudEnv]) {
+    util.proc4backend(htmlDir, rDir);
+}
+
+// 10. 打包页面文件
+execSync(`cd ${htmlDir}; tar zcf ../html4dev.tar.gz *`);
+reporter.set("tarLink", `${conf.devHost2}/dist/${project}/html4dev.tar.gz`);
+
+if(distUtils.omad){
+    distUtils.omad.publish(cloudEnv);
+}
+
+reporter.save();
+
+function validHtml(file){
+    var errors = [];
+    var html = readWork(file);
+    html = html.replace(/<!--[^\!].*?-->/g, '');
+    var msgs = [];
+    reporter.set("warnings[]", {
+        url: util.fulldir(file),
+        msgs: msgs
+    });
+
+    var count = {'link':0, 'script':0}; //css/js引用次数
+    var result, patt = /(<(link|script).*? (?:href|src)=(.*?)(?= |>).*?>)/ig;
+    while((result = patt.test(html))){
+        count[result[2]] ++;
+    }
+
+    if(lintUtils){
+        $$.each(lintUtils.html, linter => {
+            var [errs, warns] = linter(html, util);
+            errs.forEach(msg => {
+                errors.push(msg);
+            });
+            warns.forEach(msg => {
+                msgs.push(msg);
+            });
+        });
+    }
+    msgs.push(`CSS files: ${count.link}; JS files: ${count.script}`);
+    return errors.map(msg => " - " + msg).join("\n");
+}
+
+function validCss(file){
+    var content = readWork(file);
+    var errors = [];
+    var warnings = [];
+    content = content.replace(/\/\*[\s\S]*?\*\//g, '');
+    
+    var basedir = path.dirname(path.resolve(`/${vc.cdnfix}${vc.path}`, file));
+    var result, patt = /url\s*\(\s*(.*?)\s*\)/ig;
+    while((result = patt.exec(content))){
+        var link = result[1].replace(/['"]/g, '');
+        if(/\.css$/.test(link) || /^\s*(about|data|https?):/i.test(link) || link.length > 200){
+            continue;
+        }
+        //检查引用的文件是否存在
+        link = link.replace(/[\?#].*?$/, '');
+        var _file = util.fulldir(link, basedir);
+        if(!/^\//.test(_file)){
+            continue;
+        }
+        if(vc.exist && !vc.exist(_file)){
+            errors.push(`${file} 中引用的 ${_file} 不存在`);
+        }
+    }
+    
+    if(lintUtils){
+        $$.each(lintUtils.css, linter => {
+            var [errs, warns] = linter(content, util);
+            errs.forEach(msg => {
+                errors.push(msg);
+            });
+            warns.forEach(msg => {
+                warnings.push(msg);
+            });
+        });
+    }
+    if(errors.length){
+        reporter.set("errors[]", {
+            url: util.fulldir(file),
+            msgs: errors
+        });
+    }
+    if(warnings.length || !errors.length){
+        reporter.set("warnings[]", {
+            url: util.fulldir(file),
+            msgs: warnings
+        });
+    }
+    return errors.map(msg => " - " + msg).join("\n");
+}
+
+function incparse(dir, clear){
+    log(`[incparse] ${dir}`, 2, 1);
+    util.lsr(dir).forEach(file => {
+        file = file.trim();
+        log(`Parsing ${file}:\n`);
+        var ext = path.extname(file);
+        if (fs.existsSync(file) && ext != ".swf") {
+            var html = readWork(file);
+            //对于非ssi碎片，改变fulldir()所用的相对路径
+            var tmppath = path.dirname(file);
+            if (tmppath != dir && /<html|#header/i.test(html)) {
+                tmppath = tmppath.replace(new RegExp(tmpDir + `/[^/]*?/`), "");
+                if (tmppath) { //不是项目根目录
+                    global.SVNPATH = vc.path+"/"+tmppath;
+                }
+            } 
+            if(ext == ".json"){
+                html = html.replace(/"([\w\/\-\.]*?\.(js|css))"/g, (all, m1) => '"'+util.fulldir(m1)+'"');
+            }else{
+                html = util.expandFullPath(html);
+            }
+            if(clear){
+                html = html.replace(/\s*<meta\s+name="cms_id".*?>\s*/ig, "\n"); //避免暴露cmsid
+            }
+
+            writeWork(file, html);
+            global.SVNPATH = vc.path;
+        }
+    });
+}
+
+function inlineSSI(file, relroot){
+    var ssifile = file;
+    relroot = relroot.replace(new RegExp(tmpDir + `/[^/]*`), "/"+vc.cdnfix+vc.path);
+    //只接受/开头的路径
+    if(!/^\//.test(ssifile)){
+        if (/^\//.test(relroot)) {
+            relroot = relroot.replace(vc.localhost, '');
+            ssifile = path.resolve(relroot, ssifile);
+        } else {
+            global.exitERR("", "替换内联SSI出错: "+ssifile);
+        }
+    }
+    if(ssifile.indexOf("/"+vc.cdnfix+vc.path+"/inc/") == 0
+       || ssifile.indexOf("/special/") == 0){ //本项目或线上(cms)碎片
+        return `<!--#include file="${file}"-->`;
+    }
+    var reldir = path.dirname(ssifile);
+    var html;
+    if(ENV.GO_TEST || ~ssifile.indexOf(vc.cdnfix+vc.path)){
+        html = readWork(path.resolve(vc.localhost, ssifile));
+    }else{
+        html = execSync(`svn cat ${vc.host}${ssifile} ${vc.auth}`);
+    }
+    if(!html){
+        global.exitERR("", `SSI文件 ${ssifile} 不存在或为空(${file}, ${relroot})。`);
+        return `<!--#include file="${file}"-->`;
+    }
+    html = html.replace(/<!--#include\s+(file|virtual)=(['"])(\S*?)\2\s*-->/ig, (all, m1, m2, m3) => inlineSSI(m3, reldir))
+        .replace(/<meta\s+name="cms_id".*?>\s*/ig, '');
+    return html;
+}
+
+function parseSSI(path){ //替换跨频道SSI
+    log("[publish2static] 替换跨频道SSI("+path+")", 2, 1);
+    util.lsr(path, /\.s?html'/).forEach(file => {
+        file = file.trim();
+        util.stack(`出错文件: ${file}`);
+        var content = readWork(file);
+        log(`处理${f}中的SSI..`);
+        var relroot = file.replace(vc.localhost, '/');
+        if(util.backendID){  //cms项目不需要预内联
+            content = content.replace(/<!--#include\s+(file|virtual)\s*=\s*(["'])((\/|widget|modules|\.\.\/)\S*?)\2\s*-->/ig, (all, m1, m2, m3) => inlineSSI(m3, relroot));   //内联所有跨项目的ssi(/、modules、widget或../开头都要替换)
+        }
+        content = content.replace(/ _group="\S+"/g, '');
+
+        content = content.replace(/<!--\\#include\s+(file|virtual)=/ig, "<!--#include $1=");
+        writeWork(file, content);
+        util.stack([]);
+    });
+}
+
+function cpHtml(file, base){
+    if(projectJson.skipRes && /(^|\/)(modules|widget)(\/|$)/.test(dir)){
+        return;
+    }
+    if(projectJson.whiteList && !projectJson.whiteList[base]){
+        return;
+    }
+    if(projectJson.blackList && (projectJson.blackList[base] || projectJson.blackList[dir])){
+        return;
+    }
+    var dir = path.dirname(file);
+    var odir = util.getFolder(`${htmlDir}/${dir}`);
+    var content = readWork(file);
+    content = content.replace(/<!--[^\!].*?-->/g, '');
+    if(/\.s?html$/.test(base) && (collectorRE.test(content) || (projectJson.collectHtmls && projectJson.collectHtmls[base]))){ //待collect4static处理
+        global.collectHtmls.push(file);
+    }else{
+        execSync(`cp "${file}" ${odir}/`);  //$htmldir
+    }
+
+}
+
+process.exit(failed)

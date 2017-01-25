@@ -1,0 +1,92 @@
+<%=head%>
+
+<%if(typeof toperr != 'undefined'){%>
+<pre class="error"><%=toperr%></pre>
+<%}%>
+
+<table id="build-peroperties-table">
+  
+  <%if(typeof omad != 'undefined'){%>
+  <table id="build-peroperties-table">
+    <tr class="table-top"><th colspan=3>云部署</th></tr>
+    <%$$.each(omad.results, function(result){%>
+    <tr>
+      <td><%=result.desc%>(<%=result.paramStr%>)</td>
+      <td><%=result.svnver%></td>
+      <td><%=result.msg%></td>
+    </tr>
+    <%})%>
+  </table>
+  <%}%>
+  
+  <%if(typeof cmsLinks != 'undefined'){%>
+  <tr class="table-top"><th colspan=3>本项目发布的页面</th></tr>
+  <%$$.each(cmsLinks, function(info, key){%><tr>
+    <td colspan=2 title="${key}"><%=aLink(info.url)%></td>
+    <td><%=info.update==0?'无更新':info.update==1?'更新成功':'不发布'%></td>
+  </tr><%})%>
+  <%}%>
+  
+  <%if(typeof incLinks != 'undefined'){%>
+  <tr class="table-top"><th colspan=3>新发布的INC文件</th></tr>
+  <%$$.each(incLinks, function(info, key){%><tr>
+    <td title="${key}"><%=aLink(info.url)%></td>
+    <td colspan=2><%=info.ssi%></td>
+  </tr><%})%>
+  <%}%>
+  
+  <%if(typeof packFiles != 'undefined'){%>
+  <tr class="table-top"><th colspan=3>CSS/JS文件合并</th></tr>
+  <%$$.each(packFiles, function(info, name){%><tr>
+    <td><%=aLink(info.cdnurl)%></td>
+    <td colspan=2><%=packMap[info.cdnurl]%></td>
+  </tr><%})%>
+  <%}%>
+  
+  <%if(typeof collectFiles != 'undefined'){%>
+  <tr class="table-top"><th colspan=3>CSS/JS收集器</th></tr>
+  <%$$.each(collectFiles, function(link){%><tr>
+    <td><%=aLink(link)%></td>
+    <td><%=collectMap[link]%></td>
+  </tr><%})%>
+  <%}%>
+  
+  <%if(typeof tarLink != 'undefined'){%>
+  <tr class="table-top"><th colspan=3>相关文件下载</th></tr>
+  <tr><td colspan=2><%=aLink(tarLink)%></td><td>HTML文件包</td></tr>
+  <%}%>
+  
+  <%if(typeof updateFiles != 'undefined'){%>
+  <tr class="table-top"><th colspan=3>本次更新文件</th></tr>
+  <tr class="expander"><td colspan=3 onclick="toggleSubRows(this)">脚本文件</td></tr>
+  <%$$.filter(Object.keys(updateFiles), ".js").forEach(function(url){%><tr class="subrow">
+    <td colspan=3><%=aLink(url)%></td>
+  </tr><%})%>
+  <tr class="expander"><td colspan=3 onclick="toggleSubRows(this)">样式文件</td></tr>
+  <%$$.filter(Object.keys(updateFiles), ".css").forEach(function(url){%><tr class="subrow">
+    <td colspan=3><%=aLink(url)%></td>
+  </tr><%})%>
+  <tr class="expander"><td colspan=3 onclick="toggleSubRows(this)">图片及其它文件</td></tr>
+  <%$$.filter(Object.keys(updateFiles), function(f){return !/\.(js|css)/.test(f)}).forEach(function(url){%><tr class="subrow">
+    <td colspan=3><%=aLink(url)%></td>
+  </tr><%})%>
+  <%}%>
+  
+  <%if(typeof oldFiles != 'undefined'){%>
+  <tr class="table-top"><th colspan=3>历史更新文件</th></tr>
+  <tr class="expander"><td colspan=3 onclick="toggleSubRows(this)">脚本文件</td></tr>
+  <%$$.filter(Object.keys(oldFiles), ".js").forEach(function(url){%><tr class="subrow">
+    <td colspan=3><%=aLink(url)%></td>
+  </tr><%})%>
+  <tr class="expander"><td colspan=3 onclick="toggleSubRows(this)">样式文件</td></tr>
+  <%$$.filter(Object.keys(oldFiles), ".css").forEach(function(url){%><tr class="subrow">
+    <td colspan=3><%=aLink(url)%></td>
+  </tr><%})%>
+  <tr class="expander"><td colspan=3 onclick="toggleSubRows(this)">图片及其它文件</td></tr>
+  <%$$.filter(Object.keys(oldFiles), function(f){return !/\.(js|css)/.test(f)}).forEach(function(url){%><tr class="subrow">
+    <td colspan=3><%=aLink(url)%></td>
+  </tr><%})%>
+  <%}%>
+  
+</table>
+<%=foot%>

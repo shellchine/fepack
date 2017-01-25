@@ -1,0 +1,38 @@
+#!/usr/local/bin/node --harmony
+global.exitERR = function(err, warn){
+    var stack = util ? util.stack().join("\n    ") : "";
+    var msg = err || warn;
+    if(vc){
+        msg = msg.replace(new RegExp(vc.base, 'g'), '').trim();
+    }
+    if (stack) {
+        msg += "\n    "+stack;
+    }
+    if(err){
+        console.log("[rollback] ERROR: "+msg+"\n");
+        process.exit(1);
+    }else{
+        warnArr.push(msg);
+    }
+}
+
+var $$ = require('bowlder');
+var util = require("./lib/util4go");
+var log = util.log;
+var vc = util.vc;
+var execSync = util.execSync;
+
+var Reporter = require("./lib/reporter");
+var reporter = util.reporter = new Reporter("rollback", `${util.infoDir}/rollback.html`);
+
+//回滚备份的html
+function rollbackHTML(){
+
+
+}
+
+//回滚cms碎片
+function rollbackCMS(){
+
+
+}

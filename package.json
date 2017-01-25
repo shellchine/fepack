@@ -1,0 +1,28 @@
+{
+  "main": "server/app.js",
+  "version": "1.0.0",
+  "name": "fepack",
+  "author": {
+    "name": "shellchine"
+  },
+  "license": "MIT",
+  "description": "Frontend Package and Distribute Tools",
+  "keywords": [
+    "CI",
+    "frontend",
+    "package",
+    "distrubute"
+  ],
+  "dependencies": {
+    "child_process": "^1.0.2",
+    "commander": "^2.9.0",
+    "crypto": "0.0.3",
+    "express": "^4.14.0",
+    "iconv-lite": "^0.4.15",
+    "nproxy": "^1.4.5",
+    "request": "^2.67.0",
+    "sqlite3": "^3.1.8",
+    "uglify-js": "^2.7.5",
+    "uglifycss": "0.0.25"
+  }
+}
