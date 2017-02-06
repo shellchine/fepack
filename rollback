@@ -62,7 +62,7 @@ reporter.set("tarLink", `${conf.devHost2}/dist/${project}/html.tar.gz`);
 //2.1 回滚到后端
 if (util.backendID) {
     var rDir = /simu|QA/i.test(stage) ? util.rsyncDir.static : util.rsyncDir.live;
-    util.rsync2backend(rDir);
+    util.rsync2backend(util.distHtmlDir, rDir);
 }
 `cd $rsyncTmpDir; tar zcf $incdir/../html.tar.gz *`;
 log(`成功回滚到版本 ${label} .\n`);
