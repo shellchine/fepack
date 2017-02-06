@@ -12,7 +12,7 @@ module.exports = {
     },
     pack: ["base", "bdc"],
     devDist: ["omad"],
-    dist: ["cdn", "rsync", "cms", "omad"],
+    dist: ["cdn", "cms", "omad", "rsync"],
     cdns: [
         {
             base: "http://img2.cache.netease.com/f2e",

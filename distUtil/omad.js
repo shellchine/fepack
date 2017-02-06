@@ -49,7 +49,8 @@ var cloudSVNRoot = "https://static.f2e.netease.com/go";
 var rsyncParent = projectJson.parentProject;
 var omad = {}
 
-omad.publish = function(cloudEnv){
+omad.publish = function(){
+    var cloudEnv = global.cloudEnv;
     if (!util.isDir(cloudRoot)) {
         global.exitERR(`找不到云部署SVN根目录: ${cloudRoot}`);
         return;
@@ -68,13 +69,13 @@ omad.publish = function(cloudEnv){
             var svnMsg = util.execSync(`cd ${cDir};svn add * --parents --force;svn ci -m "${project}(${stage}) v${label}"`);
             console.log(svnMsg);
             var svnVer = svnMsg.replace(/.*?\s(\d+)。.*/, "$1");
-            util.reporter.set("omad.svn", {ver: svnVer, cloudDir, cSVNDir});
+            util.reporter.set("omad.svn", {ver: svnVer, localDir: cloudDir, remoteDir: cSVNDir});
             log("omadBatch:\n");
             omadBatch(projectJson[cloudEnv]);
         }
     }
-
 }
+
 function omadBatch(arr){
     if (arr.length > -1) {
         log("[omad] Deploy", 2, 1);

@@ -1,4 +1,5 @@
 #!/usr/local/bin/node --harmony
+var warnArr = [];
 global.exitERR = function(err, warn){
     var stack = util ? util.stack().join("\n    ") : "";
     var msg = err || warn;
@@ -9,30 +10,75 @@ global.exitERR = function(err, warn){
         msg += "\n    "+stack;
     }
     if(err){
-        console.log("[rollback] ERROR: "+msg+"\n");
+        msg = "[rollback] ERROR: "+msg+"\n";
+        warnArr.push(msg);
+        console.log(msg);
+        reporter.set("toperr", warnArr.join("\n").replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+        reporter.save();
         process.exit(1);
     }else{
         warnArr.push(msg);
     }
 }
 
-var $$ = require('bowlder');
+var fs = require('fs');
+var $$ = require('./lib/bowlder');
 var util = require("./lib/util4go");
+var ENV = process.env;
+var stage = ENV.GO_STAGE_NAME;
+var label = ENV.GO_PIPELINE_LABEL || 0;
+var svnver = ENV.GO_REVISION || 1;
+var project = ENV.GO_PIPELINE_NAME;
 var log = util.log;
 var vc = util.vc;
 var execSync = util.execSync;
+var conf = util.conf;
+var distUtils = {};
+$$.each(conf.dist, name=>{
+    distUtils[name] = require("./distUtil/" + name);
+});
 
 var Reporter = require("./lib/reporter");
 var reporter = util.reporter = new Reporter("rollback", `${util.infoDir}/rollback.html`);
 
-//回滚备份的html
-function rollbackHTML(){
+//1. 回滚cdn文件映射表($infoDir/.curfiles)
+var backupFile = `${util.backupDir}/info.${label}.tar.gz`;
+if(!fs.existsSync(backupFile)){
+    global.exitERR("找不到info备份文件: "+backupFile);
+}
+execSync(`cd ${util.infoDir};tar zmxf ${backupFile}`);
+reporter.set("oldFiles", util.RESFILES.current);
+reporter.set("rollbackFiles", util.readFromLog(util.logfiles.resfiles, util.logfmts.resfiles));
 
 
+//2. 回滚备份的html($infoDir/$label.tar.gz)
+backupFile = `${util.backupDir}/html.${label}.tar.gz`;
+if(!fs.existsSync(backupFile)){
+    global.exitERR("找不到html备份文件: "+backupFile);
+}
+execSync(`cd ${util.distHtmlDir};tar zmxf ${backupFile};cp ${backupFile} ../html.tar.gz`);
+reporter.set("tarLink", `${conf.devHost2}/dist/${project}/html.tar.gz`);
+
+//2.1 回滚到后端
+if (util.backendID) {
+    var rDir = /simu|QA/i.test(stage) ? util.rsyncDir.static : util.rsyncDir.live;
+    util.rsync2backend(rDir);
+}
+`cd $rsyncTmpDir; tar zcf $incdir/../html.tar.gz *`;
+log(`成功回滚到版本 ${label} .\n`);
+
+//2.2 回滚omad
+global.cloudEnv = "omadLive";
+if(distUtils.omad){
+    distUtils.omad.publish();
 }
 
-//回滚cms碎片
-function rollbackCMS(){
-
-
+//2.3 回滚cms(仅inc碎片)
+var cmsUtil = distUtils.cms;
+var channel = ENV.CMS_CHANNEL;
+if(cmsUtil && channel){
+    //await cmsUtil.publishInc();
 }
+
+//3. 报告
+reporter.save();

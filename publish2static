@@ -1,4 +1,5 @@
 #!/usr/local/bin/node --harmony
+var errorArr = [];
 global.exitERR = function(err, warn){
     var stack = util ? util.stack().join("\n    ") : "";
     if(err) {
@@ -22,7 +23,6 @@ global.exitERR = function(err, warn){
     }
     return err || warn;
 }
-var errorArr = [];
 var fs = require('fs');
 var request = require('request');
 var iconv = require('iconv-lite');
@@ -37,7 +37,7 @@ var label = ENV.GO_PIPELINE_LABEL || 0;
 var svnver = ENV.GO_REVISION || 1;
 var project = ENV.GO_PIPELINE_NAME;
 var log = util.log;
-var cloudEnv = "omadDev";
+var cloudEnv = global.cloudEnv = "omadDev";
 var vc = util.vc;
 //相对工作目录读写
 var pwd = ENV.PWD;
@@ -68,9 +68,19 @@ var projectJson = util.projectJson;
 var collectorRE = /bowlder.jssddd/;
 
 var distUtils = {};
+var distFns = [];
 $$.each(conf.devDist, name=>{
     distUtils[name] = require("./distUtil/" + name);
+    if(distUtils[name] && $$.isFunction(distUtils[name].publish)){
+        distFns.push(distUtils[name].publish);
+    }
 });
+if(fs.existsSync(`${infoDir}/goscript/dist_dev.js`)){
+    var _dist = require(`${infoDir}/goscript/dist_dev.js`);
+    if($$.isFunction(_dist.publish)){
+        distFns.push(_dist.publish);
+    }
+}
 
 var failed = 0;
 
@@ -166,10 +176,9 @@ if (util.backendID || projectJson[cloudEnv] || ENV[cloudEnv]) {
 execSync(`cd ${htmlDir}; tar zcf ../html4dev.tar.gz *`);
 reporter.set("tarLink", `${conf.devHost2}/dist/${project}/html4dev.tar.gz`);
 
-if(distUtils.omad){
-    distUtils.omad.publish(cloudEnv);
-}
+distFns.forEach(fn => fn());
 
+reporter.set("toperr", errorArr.join("\n").replace(/</g, '&lt;').replace(/>/g, '&gt;'));
 reporter.save();
 
 function validHtml(file){

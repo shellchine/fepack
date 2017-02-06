@@ -1,3 +1,4 @@
+//将静态资源文件(images/js/css/swf..)上传到cdn
 var fs = require('fs');
 var path = require('path');
 var request = require('request');

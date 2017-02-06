@@ -22,6 +22,7 @@ if(!ENV.GO_TEST){
     var tmp = proc.execSync(`git remote -v`, {encoding: "utf-8"});
     if (new RegExp(`${git.host}/(\\S+)`).test(tmp)) {
         git.path = RegExp.$1;
+        git.path = git.path.replace(/\.git$/, '');
     }
     tmp = proc.execSync(`git log --max-count=1`, {encoding: "utf-8"});
     if(/Author:\s*(\S+)/.test(tmp)){

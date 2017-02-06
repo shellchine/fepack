@@ -10,7 +10,11 @@ global.exitERR = function(err, warn){
         msg += "\n    "+stack;
     }
     if(err){
-        console.log("[publish2cdn] ERROR: "+msg+"\n");
+        msg = "[publish2live] ERROR: "+msg+"\n";
+        warnArr.push(msg);
+        console.log(msg);
+        reporter.set("toperr", warnArr.join("\n").replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+        reporter.save();
         process.exit(1);
     }else{
         warnArr.push(msg);
@@ -32,7 +36,6 @@ var stage = ENV.GO_STAGE_NAME;
 var label = ENV.GO_PIPELINE_LABEL || 0;
 var svnver = ENV.GO_REVISION || 1;
 var project = ENV.GO_PIPELINE_NAME;
-var cloudEnv = "omadLive";
 var RESFILES = util.RESFILES;
 var logfiles = util.logfiles;
 var logfmts = util.logfmts;
@@ -54,11 +57,19 @@ $$.each(conf.pack, name=>{
     packUtils[name] = require("./packUtil/" + name);
 });
 var distUtils = {};
+var distFns = [];
 $$.each(conf.dist, name=>{
     distUtils[name] = require("./distUtil/" + name);
+    if(distUtils[name] && $$.isFunction(distUtils[name].publish)){
+        distFns.push(distUtils[name].publish);
+    }
 });
-//备份目录
-var backupDir = util.backupDir;
+if(fs.existsSync(`${infoDir}/goscript/dist.js`)){
+    var _dist = require(`${infoDir}/goscript/dist.js`);
+    if($$.isFunction(_dist.publish)){
+        distFns.push(_dist.publish);
+    }
+}
 //临时目录
 var tmpDir = util.tmpDir;
 var htmlDir = util.getFolder(util.distHtmlDir, !/Live/.test(stage));
@@ -121,6 +132,7 @@ var projectJson = util.projectJson;
         var count = util.lsr(htmlDir).length;
         if(count > 0){
             execSync(`cd ${htmlDir}; tar zcf ../html.tar.gz *`);
+            execSync(`cd ${infoDir}; tar zcf ${util.backupDir}/info.${label}.tar.gz .*`);
             reporter.set("tarLink", `${conf.devHost2}/dist/${project}/html.tar.gz`);
             //rollback备份
             var backupFile = `${util.backupDir}/html.${label}.tar.gz`;
@@ -136,9 +148,8 @@ var projectJson = util.projectJson;
         }
     }
     // 发布到本地svn，并触发云部署deploy
-    if(distUtils.omad){
-        distUtils.omad.publish(/simu|qa/i.test(stage) ? "omadQA" : "omadLive");
-    }
+    global.cloudEnv = /simu|qa/i.test(stage) ? "omadQA" : "omadLive";
+    distFns.forEach(fn => fn());
 
     // 11. 报表
     reporter.set("incLinks", global.CMSRESULT && global.CMSRESULT.inc);
@@ -149,6 +160,7 @@ var projectJson = util.projectJson;
     reporter.set("collectFiles", util.RESFILES.collectFiles);
     reporter.set("packMap", global.packjscss);
     reporter.set("collectMap", {});
+    reporter.set("toperr", warnArr.join("\n").replace(/</g, '&lt;').replace(/>/g, '&gt;'));
     reporter.save();
     //saveBackup();
 
@@ -197,7 +209,7 @@ async function inlineSSI(file, relroot){
 }
 
 async function parseSSI(dir){
-    log(`[publish2cdn] parseSSI(${dir})`, 2, 1);
+    log(`[publish2live] parseSSI(${dir})`, 2, 1);
     await Promise.all(util.lsr(dir, /\.s?html$/).map(async function(f){
         util.stack("出错文件: " + f);
         log(f + ":\n");
