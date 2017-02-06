@@ -43,7 +43,7 @@ var distStaticDirs = util.distStaticDirs;
 //当前项目静态资源在cdn ftp上的保存目录
 var ftpRootDir = path.join(conf.cdnRootDir, `/${vc.cdnfix}${vc.path}`);
 //相对工作目录读写
-var pwd = ENV.PWD;
+var pwd = process.cwd();
 var read = util.read;
 var write = util.write;
 var readWork = util.readWork;

@@ -138,52 +138,58 @@ if(!/devQA/i.test(stage)){
 
 util.printTime();
 
-util.wander(function(dir){
-    return util.isValidDir(dir);
-}, function(file, base){
-    var flag = util.isValidFile(base);
-    if (flag == 9) {
-        cpHtml(file, base);
+(async function(){
+    await util.wander(function(dir){
+        return util.isValidDir(dir);
+    }, function(file, base){
+        var flag = util.isValidFile(base);
+        if (flag == 9) {
+            cpHtml(file, base);
+        } else if(flag) { //不发布static服务器及cdn
+            
+        }
+    }, /^(__|\.|goscript|_backup)/);
+
+    //publish to static.f2e.netease.com
+    if(!/devQA/i.test(stage)){
+
+        // 6. 扩展相对路径(仅后端项目)
+        if (util.backendID || projectJson[cloudEnv] || ENV[cloudEnv]) {
+            log(`处理${htmlDir}目录(parseSSI)`, 2, 1);
+            parseSSI(htmlDir);     //内联所有外部ssi
+            //扩充相对路径，默认基于项目根目录
+            incparse(htmlDir);
+        }
+
+        if (global.collectHtmls && global.collectHtmls.length >= 0) {
+            var collectHtmls = global.collectHtmls.join(", ");
+            console.log("收集页面: "+collectHtmls);
+            require("util/collect_static");
+        }else{
+            fs.rmdir(`${util.tmpDir}/inc_col`);
+            fs.rmdir(`${util.tmpDir}/collect_dev`);
+            fs.rmdir(`${util.tmpDir}/htmldir4col`);
+        }
+
     }
-}, /^(__|\.|goscript|_backup)/);
 
-//publish to static.f2e.netease.com
-if(!/devQA/i.test(stage)){
-
-    // 6. 扩展相对路径(仅后端项目)
+    var rDir = util.rsyncDir.static;
+    // rsync同步到后端服务器(非云主机)
     if (util.backendID || projectJson[cloudEnv] || ENV[cloudEnv]) {
-        log(`处理${htmlDir}目录(parseSSI)`, 2, 1);
-        parseSSI(htmlDir);     //内联所有外部ssi
-        //扩充相对路径，默认基于项目根目录
-        incparse(htmlDir);
+        util.proc4backend(htmlDir, rDir);
     }
 
-    if (global.collectHtmls && global.collectHtmls.length >= 0) {
-        var collectHtmls = global.collectHtmls.join(", ");
-        console.log("收集页面: "+collectHtmls);
-        require("util/collect_static");
-    }else{
-        fs.rmdir(`${util.tmpDir}/inc_col`);
-        fs.rmdir(`${util.tmpDir}/collect_dev`);
-        fs.rmdir(`${util.tmpDir}/htmldir4col`);
-    }
+    // 10. 打包页面文件
+    execSync(`cd ${htmlDir}; tar zcf ../html4dev.tar.gz *`);
+    reporter.set("tarLink", `${conf.devHost2}/dist/${project}/html4dev.tar.gz`);
 
-}
+    distFns.forEach(fn => fn());
 
-var rDir = util.rsyncDir.static;
-// rsync同步到后端服务器(非云主机)
-if (util.backendID || projectJson[cloudEnv] || ENV[cloudEnv]) {
-    util.proc4backend(htmlDir, rDir);
-}
+    reporter.set("toperr", errorArr.join("\n").replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+    reporter.save();
 
-// 10. 打包页面文件
-execSync(`cd ${htmlDir}; tar zcf ../html4dev.tar.gz *`);
-reporter.set("tarLink", `${conf.devHost2}/dist/${project}/html4dev.tar.gz`);
-
-distFns.forEach(fn => fn());
-
-reporter.set("toperr", errorArr.join("\n").replace(/</g, '&lt;').replace(/>/g, '&gt;'));
-reporter.save();
+    process.exit(failed)
+})();
 
 function validHtml(file){
     var errors = [];
@@ -369,5 +375,3 @@ function cpHtml(file, base){
     }
 
 }
-
-process.exit(failed)
