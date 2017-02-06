@@ -17,9 +17,9 @@
         </variable>{{omad}}
       </environmentvariables>
       <materials>
-        <svn url="http://gitlab.rongcloud.net/{{vcpath}}" username="web@rongcloud.cn" encryptedPassword="NrXHOLXkiJgDaBQASBOUVg==" autoUpdate="false" />
+        <git url="git@gitlab.rongcloud.net:{{vcpath}}" />
       </materials>
-      <stage name="devStage">
+      <stage name="DevStage">
         <approval type="manual" />
         <jobs>
           <job name="publish2static">
@@ -38,7 +38,7 @@
       <stage name="PublishStage">
         <approval type="manual" />
         <jobs>
-          <job name="publish2cdn">
+          <job name="publish2live">
             <tasks>
               <exec command="/var/fepack/script/publish2live" />
             </tasks>
