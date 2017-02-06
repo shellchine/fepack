@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/local/bin/node --harmony
 
 var program = require('commander');
 var nproxy = require('nproxy');

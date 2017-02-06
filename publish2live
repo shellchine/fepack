@@ -1,4 +1,4 @@
-#!/usr/bin/env node --harmony
+#!/usr/local/bin/node --harmony
 var warnArr = [];
 global.exitERR = function(err, warn){
     var stack = util ? util.stack().join("\n    ") : "";
