@@ -4,7 +4,9 @@ global.exitERR = function(err, warn){
     var stack = util ? util.stack().join("\n    ") : "";
     if(err) {
         failed = 1;
-        err = err.replace(new RegExp(vc.base, 'g'), '');
+        if(vc){
+            err = err.replace(new RegExp(vc.base, 'g'), '');
+        }
         if (stack) {
             err = err.trim();
             err += "\n    "+stack;
@@ -13,7 +15,9 @@ global.exitERR = function(err, warn){
         errorArr.push("[publish2static] "+err);
     }
     if(warn) {
-        warn = warn.replace(new RegExp(vc.base, 'g'), '');
+        if(vc){
+            warn = warn.replace(new RegExp(vc.base, 'g'), '');
+        }
         if (stack) {
             warn = warn.trim();
             warn += "\n    "+stack;
