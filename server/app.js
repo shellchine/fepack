@@ -14,15 +14,18 @@ program
     .option('-d, --debug', 'Enable debug mode')
     .parse(process.argv);
 
+var port = program.port || 8989;
 
-nproxy(program.port, {
+nproxy(port, {
     "responderListFilePath": program.list,
     "debug": !!program.debug
 });
 
 var app = express();
-var expressPort = program.port + 1;
-//app.use(express.static(__dirname + '/public'));
+var expressPort = port + 1;
+app.use(express.static(__dirname + '/public'));
+
+require('./go')(app);
 
 app.get('/nproxy/:url', function(req, res) {
     
@@ -32,7 +35,6 @@ app.get('/nproxy/:url', function(req, res) {
         }catch(e){
             return Promise.reject(e);
         }
-        var data = await promise;
         return res.html(html);
     })().catch(e => {
         console.log(e);

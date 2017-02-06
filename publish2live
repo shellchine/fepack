@@ -56,7 +56,7 @@ var packUtils = {};
 $$.each(conf.pack, name=>{
     packUtils[name] = require("./packUtil/" + name);
 });
-var distUtils = {};
+var distUtils = global.distUtils = {};
 var distFns = [];
 $$.each(conf.dist, name=>{
     distUtils[name] = require("./distUtil/" + name);
@@ -214,7 +214,7 @@ async function parseSSI(dir){
         util.stack("出错文件: " + f);
         log(f + ":\n");
         var content = readWork(f);
-        //content =~ s#/exports/$project/inc_dev/#/$cdnfix$svnpath/inc/#g;  //inc相对路径当主文件不在根目录时有问题
+        //inc相对路径当主文件不在根目录时有问题
         var relroot = pathFromVc(path.dirname(f));
         if(/<html|#header/i.test(content)){ //f是主文件
             global.SVNPATH = relroot.substr(1);

@@ -1,6 +1,6 @@
 module.exports = {
     firm: "netease",
-    cacheDir: "/var/frontend/fepack",
+    cacheDir: "/var/fepack",
     devHost: "http://static.f2e.netease.com",
     devHost2: "http://qa.developer.163.com",
     devHttpsHost: "https://qa.developer.163.com",
@@ -10,9 +10,9 @@ module.exports = {
         js: ["js.base"],
         html: ["html.base"]
     },
-    pack: ["base", "bdc"],
+    pack: ["base"],
     devDist: ["omad"],
-    dist: ["cdn", "cms", "omad", "rsync"],
+    dist: ["cms", "omad", "rsync"],
     cdns: [
         {
             base: "http://img2.cache.netease.com/f2e",

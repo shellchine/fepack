@@ -67,7 +67,7 @@ var incDir = `${tmpDir}/inc_dev`;
 var projectJson = util.projectJson;
 var collectorRE = /bowlder.jssddd/;
 
-var distUtils = {};
+var distUtils = global.distUtils = {};
 var distFns = [];
 $$.each(conf.devDist, name=>{
     distUtils[name] = require("./distUtil/" + name);

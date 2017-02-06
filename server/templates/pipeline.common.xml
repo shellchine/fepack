@@ -1,0 +1,70 @@
+    <pipeline name="{{name}}">
+      <environmentvariables>
+        <variable name="CSS_COMPRESS">
+          <value>1</value>
+        </variable>
+        <variable name="JS_COMPRESS">
+          <value>2</value>
+        </variable>
+        <variable name="SYNC_GLUSTER_INC">
+          <value>{{channel}}</value>
+        </variable>
+        <variable name="REFRESH_LOAD">
+          <value>0</value>
+        </variable>
+        <variable name="SYNC_FULL">
+          <value>1</value>
+        </variable>{{omad}}
+      </environmentvariables>
+      <materials>
+        <svn url="http://gitlab.rongcloud.net/{{vcpath}}" username="web@rongcloud.cn" encryptedPassword="NrXHOLXkiJgDaBQASBOUVg==" autoUpdate="false" />
+      </materials>
+      <stage name="devStage">
+        <approval type="manual" />
+        <jobs>
+          <job name="publish2static">
+            <tasks>
+              <exec command="/var/fepack/script/publish2static" />
+            </tasks>
+            <tabs>
+              <tab name="Check_result" path="gohtml/dev.html" />
+            </tabs>
+            <artifacts>
+              <artifact src="/var/fepack/info/{{name}}/dev.html" dest="gohtml" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="PublishStage">
+        <approval type="manual" />
+        <jobs>
+          <job name="publish2cdn">
+            <tasks>
+              <exec command="/var/fepack/script/publish2live" />
+            </tasks>
+            <tabs>
+              <tab name="CDN_Files" path="gohtml/live.html" />
+            </tabs>
+            <artifacts>
+              <artifact src="/var/fepack/info/{{name}}/live.html" dest="gohtml" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+      <stage name="Rollback">
+        <approval type="manual" />
+        <jobs>
+          <job name="rollback">
+            <tasks>
+              <exec command="/var/fepack/script/rollback" />
+            </tasks>
+            <tabs>
+              <tab name="RollBack" path="gohtml/rollback.html" />
+            </tabs>
+            <artifacts>
+              <artifact src="/var/fepack/info/{{name}}/rollback.html" dest="gohtml" />
+            </artifacts>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
