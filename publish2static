@@ -44,7 +44,7 @@ var log = util.log;
 var cloudEnv = global.cloudEnv = "omadDev";
 var vc = util.vc;
 //相对工作目录读写
-var pwd = ENV.PWD;
+var pwd = process.cwd();
 var read = util.read;
 var write = util.write;
 var readWork = util.readWork;
