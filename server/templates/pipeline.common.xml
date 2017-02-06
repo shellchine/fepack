@@ -9,11 +9,8 @@
         <variable name="SYNC_GLUSTER_INC">
           <value>{{channel}}</value>
         </variable>
-        <variable name="REFRESH_LOAD">
-          <value>0</value>
-        </variable>
-        <variable name="SYNC_FULL">
-          <value>1</value>
+        <variable name="GO_CONFIG">
+          <value>conf.rongcloud</value>
         </variable>{{omad}}
       </environmentvariables>
       <materials>
