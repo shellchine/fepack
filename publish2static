@@ -38,7 +38,7 @@ var execSync = util.execSync;
 var ENV = process.env;
 var stage = ENV.GO_STAGE_NAME;
 var label = ENV.GO_PIPELINE_LABEL || 0;
-var svnver = ENV.GO_REVISION || 1;
+var vcver = ENV.GO_REVISION || 1;
 var project = ENV.GO_PIPELINE_NAME;
 var log = util.log;
 var cloudEnv = global.cloudEnv = "omadDev";
@@ -90,7 +90,7 @@ var failed = 0;
 
 if(!/devQA/i.test(stage)){
     if(vc.publish.dev){ //发布未压缩版
-        vc.publish.dev(svnver, vc.cdnfix+vc.path);
+        vc.publish.dev(vcver, vc.cdnfix+vc.path);
     }
     log("HTML例行检查", 2, 1);
     util.lsr(".", /\.s?html?$/).forEach(file => {
@@ -139,16 +139,18 @@ if(!/devQA/i.test(stage)){
 util.printTime();
 
 (async function(){
+    log("复制源代码", 2, 1);
     await util.wander(function(dir){
         return util.isValidDir(dir);
     }, function(file, base){
         var flag = util.isValidFile(base);
         if (flag == 9) {
             cpHtml(file, base);
-        } else if(flag) { //不发布static服务器及cdn
-            
+        } else if(flag == 10) { //不发布到static服务器及cdn的其它文件
+            cpRes(file, base);
         }
     }, /^(__|\.|goscript|_backup)/);
+    util.printTime();
 
     //publish to static.f2e.netease.com
     if(!/devQA/i.test(stage)){
@@ -275,7 +277,10 @@ function validCss(file){
 function incparse(dir, clear){
     log(`[incparse] ${dir}`, 2, 1);
     util.lsr(dir).forEach(file => {
-        file = file.trim();
+        if(util.isPreserved(file)){
+            return;
+        }
+        
         log(`Parsing ${file}:\n`);
         var ext = path.extname(file);
         if (fs.existsSync(file) && ext != ".swf") {
@@ -285,7 +290,7 @@ function incparse(dir, clear){
             if (tmppath != dir && /<html|#header/i.test(html)) {
                 tmppath = tmppath.replace(new RegExp(tmpDir + `/[^/]*?/`), "");
                 if (tmppath) { //不是项目根目录
-                    global.SVNPATH = vc.path+"/"+tmppath;
+                    global.VCPATH = vc.path+"/"+tmppath;
                 }
             } 
             if(ext == ".json"){
@@ -298,7 +303,7 @@ function incparse(dir, clear){
             }
 
             writeWork(file, html);
-            global.SVNPATH = vc.path;
+            global.VCPATH = vc.path;
         }
     });
 }
@@ -355,6 +360,8 @@ function parseSSI(path){ //替换跨频道SSI
 }
 
 function cpHtml(file, base){
+    var dir = path.dirname(file);
+    var odir = util.getFolder(`${htmlDir}/${dir}`);
     if(projectJson.skipRes && /(^|\/)(modules|widget)(\/|$)/.test(dir)){
         return;
     }
@@ -364,14 +371,20 @@ function cpHtml(file, base){
     if(projectJson.blackList && (projectJson.blackList[base] || projectJson.blackList[dir])){
         return;
     }
-    var dir = path.dirname(file);
-    var odir = util.getFolder(`${htmlDir}/${dir}`);
     var content = readWork(file);
     content = content.replace(/<!--[^\!].*?-->/g, '');
     if(/\.s?html$/.test(base) && (collectorRE.test(content) || (projectJson.collectHtmls && projectJson.collectHtmls[base]))){ //待collect4static处理
         global.collectHtmls.push(file);
     }else{
-        execSync(`cp "${file}" ${odir}/`);  //$htmldir
+        util.cpFile(file, odir);
     }
+}
 
+function cpRes(file, base){
+    var dir = path.dirname(file);
+    var odir = util.getFolder(`${util.distStaticDirs[0]}/${dir}`);
+    if(projectJson.skipRes && /(^|\/)(modules|widget)(\/|$)/.test(dir)){
+        return;
+    }
+    util.cpFile(file, odir);
 }

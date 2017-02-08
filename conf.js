@@ -4,7 +4,10 @@ module.exports = {
     devHost: "http://static.f2e.netease.com",
     devHost2: "http://qa.developer.163.com",
     devHttpsHost: "https://qa.developer.163.com",
-    vc: "git",
+    vc: {
+        type: "git",
+        host: ""
+    },
     lint: {
         css: ["css.base"],
         js: ["js.base"],
@@ -13,6 +16,10 @@ module.exports = {
     pack: ["base"],
     devDist: ["omad"],
     dist: ["cms", "omad", "scp"],
+    files: {
+        exclude: /\.(avi|mpeg|psd)$/,
+        preserve: /\.(php|jsp|asp|xml|min\.js|min\.css)$/
+    },
     cdns: [
         {
             base: "http://img2.cache.netease.com/f2e",

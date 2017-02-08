@@ -1,5 +1,5 @@
 var pathUtil = require('path');
-var conf = require('../conf.js');
+var conf = require('./conf.js');
 var Store = require('../lib/store');
 var packDb = new Store(`${conf.cacheDir}/info/jspack.db`);
 var stmts = {

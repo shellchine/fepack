@@ -7,7 +7,7 @@
           <value>2</value>
         </variable>
         <variable name="SYNC_GLUSTER_INC">
-          <value>{{channel}}</value>
+          <value>{{dest}}</value>
         </variable>
         <variable name="GO_CONFIG">
           <value>conf.rongcloud</value>
@@ -24,10 +24,10 @@
               <exec command="/var/fepack/script/publish2static" />
             </tasks>
             <tabs>
-              <tab name="Check_result" path="gohtml/dev.html" />
+              <tab name="Lint" path="gohtml/dev.html" />
             </tabs>
             <artifacts>
-              <artifact src="/var/fepack/info/{{name}}/dev.html" dest="gohtml" />
+              <artifact src=".go/dev.html" dest="gohtml" />
             </artifacts>
           </job>
         </jobs>
@@ -40,10 +40,10 @@
               <exec command="/var/fepack/script/publish2live" />
             </tasks>
             <tabs>
-              <tab name="CDN_Files" path="gohtml/live.html" />
+              <tab name="Files" path="gohtml/live.html" />
             </tabs>
             <artifacts>
-              <artifact src="/var/fepack/info/{{name}}/live.html" dest="gohtml" />
+              <artifact src=".go/live.html" dest="gohtml" />
             </artifacts>
           </job>
         </jobs>
@@ -59,7 +59,7 @@
               <tab name="RollBack" path="gohtml/rollback.html" />
             </tabs>
             <artifacts>
-              <artifact src="/var/fepack/info/{{name}}/rollback.html" dest="gohtml" />
+              <artifact src=".go/rollback.html" dest="gohtml" />
             </artifacts>
           </job>
         </jobs>

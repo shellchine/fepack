@@ -34,7 +34,6 @@ var execSync = util.execSync;
 var ENV = process.env;
 var stage = ENV.GO_STAGE_NAME;
 var label = ENV.GO_PIPELINE_LABEL || 0;
-var svnver = ENV.GO_REVISION || 1;
 var project = ENV.GO_PIPELINE_NAME;
 var RESFILES = util.RESFILES;
 var logfiles = util.logfiles;
@@ -70,6 +69,7 @@ if(fs.existsSync(`${infoDir}/goscript/dist.js`)){
         distFns.push(_dist.publish);
     }
 }
+var cmsUtil = distUtils.cms;
 //临时目录
 var tmpDir = util.tmpDir;
 var htmlDir = util.getFolder(util.distHtmlDir, !/Live/.test(stage));
@@ -81,14 +81,11 @@ var projectJson = util.projectJson;
     if (!/Live/.test(stage)) {         //publishStage, publishQAStage
         // 1. ~ 4.
         await cp4live();
-        // 6. 处理collect文件
-        //require("./pack/bdc");
 
         await parseSSI(htmlDir);     //将html中的外部ssi全部内联
     }
     // 6c. 处理要发布到cms的文件
-    if(distUtils.cms && util.isDir(util.distCmsDir)){
-        var cmsUtil = distUtils.cms;
+    if(cmsUtil && util.isDir(util.distCmsDir)){
         log("发布CMS页面", 2, 1);
         var channel = ENV.CMS_CHANNEL;
         if(!channel){
@@ -140,10 +137,10 @@ var projectJson = util.projectJson;
                 var time = +new Date;
                 execSync(`mv ${backupFile} ${util.backupDir}/html.${label}.${time}.tar.gz`);
             }
-            execSync(`cp ${util.distDir}/html.tar.gz ${backupFile}`);
+            util.cpFile(`${util.distDir}/html.tar.gz`, backupFile);
             if(util.rsyncDir.backup){
                 util.getFolder(util.rsyncDir.backup);
-                execSync(`cp ${backupFile} ${util.rsyncDir.backup}`);
+                util.cpFile(backupFile, util.rsyncDir.backup);
             }
         }
     }
@@ -211,19 +208,22 @@ async function inlineSSI(file, relroot){
 async function parseSSI(dir){
     log(`[publish2live] parseSSI(${dir})`, 2, 1);
     await Promise.all(util.lsr(dir, /\.s?html$/).map(async function(f){
+        if(util.isPreserved(f)){
+            return;
+        }
         util.stack("出错文件: " + f);
         log(f + ":\n");
         var content = readWork(f);
         //inc相对路径当主文件不在根目录时有问题
         var relroot = pathFromVc(path.dirname(f));
         if(/<html|#header/i.test(content)){ //f是主文件
-            global.SVNPATH = relroot.substr(1);
+            global.VCPATH = relroot.substr(1);
         }
         //内联所有跨项目的ssi
         content = await util.replaceAsync(content, /<!--#include\s+(file|virtual)=(["'])((\/|\.\.\/|widget|modules)\S*?)\2\s*-->/ig, (all, m1, m2, m3) => inlineSSI(m3, relroot));
         //内联*.js, *.json
         content = content.replace(/<!--#include\s+(file|virtual)=(["'])(\S+?\.(js|json))\2\s*-->/ig, (all, m1, m2, m3) => inlineSSI(m3, relroot));
-        global.SVNPATH = vc.path;
+        global.VCPATH = vc.path;
         util.writeTmp(f, content);
         util.stack([]);
     }));
@@ -234,7 +234,7 @@ async function parseSSI(dir){
 //其它静态资源复制到util.distStaticDirs[i]下
 async function cp4live(){
     // 1a. 更新swf, pdf, css
-    log("[res2cdn] 更新swf/pdf/css静态资源\n");
+    log("[cp4live] 更新可能被js引用的静态资源\n");
     await util.wander(function(dir, base){
         return util.isResDir(dir, 1);
     }, async function(file, base){
@@ -242,7 +242,7 @@ async function cp4live(){
         var ext = path.extname(file);
         if (flag) {
             if (flag == 2 || ext == '.css') {
-                await util.cpFile(file, base, flag);
+                await util.cpRes(file, base, flag);
             }else if (flag == 9) {
                 cpHtml(file, base);
             }
@@ -250,14 +250,15 @@ async function cp4live(){
     });
     // 1b. 更新swf, pdf, css
     if (distUtils.cdn && RESFILES.uploadCount[2]) {
-        log(`上传swf/pdf/mp3到文件CDN(${RESFILES.uploadCount[2]} 个文件)`, 2, 1);
+        log(`上传可能被js引用的静态资源到CDN(uploadCount: ${JSON.stringify(RESFILES.uploadCount)})`, 2, 1);
         ftp.publish(conf.cdns[1].ftp, distUtils.cdn.mirrorCommand(distStaticDirs[1], ftpRootDir)); //file
     }
     var csscount = RESFILES.uploadCount[1] || 0;
     global.cdnCount += csscount;
     upload2ImgCdn();
+    util.printTime();
     /// 1c. 更新图片, js, css
-    console.log(`[res2cdn] 更新普通静态资源(CSS文件: ${RESFILES.uploadCount[1]})\n`);
+    console.log(`\n[cp4live] 更新所有静态资源(uploadCount: ${JSON.stringify(RESFILES.uploadCount)})\n`);
     await util.wander(function(dir, base){
         return util.isResDir(dir, 1);
     }, async function(file, base){
@@ -265,7 +266,7 @@ async function cp4live(){
         var ext = path.extname(file);
         if (flag && flag != 2) {
             if (flag != 9 && ext != '.css') {
-                await util.cpFile(file, base, flag);
+                await util.cpRes(file, base, flag);
             }
         }
     });
@@ -332,19 +333,24 @@ function cpHtml(fullname, base){
     }
     var dir = path.dirname(fullname);
     var odir = util.getFolder(`${htmlDir}/${dir}`);
-    execSync(`cp "${fullname}" ${odir}/`);
-    //要发布到cms的文件
-    var tmp = util.readWork(fullname);
-    tmp = tmp.replace(/<!--\s*<meta.*?-->/ig, '');
     if (fs.existsSync(`${colHtmlDir}/${fullname}`)) { //优先使用html4col目录下的html
         fullname = path.resolve(colHtmlDir, fullname);
     }
-    //复制到发布预处理目录
-    if (/<meta\s*name="cms_id".*?content="\d{4}\S+?"/i.test(tmp)) {
-        odir = util.getFolder(`${util.distCmsDir}/${dir}`);
-        log(`Prepare CMS Html: ${fullname}\n`);
-        execSync(`cp "${fullname}" ${odir}/`);
+    if(!util.isPreserved(base)){
+        console.log(`Prepare Page: ${fullname}`);
     }
-    console.log(`Prepare Common Html: ${fullname}`);
-    execSync(`cp "${fullname}" ${odir}/`);
+    util.cpFile(fullname, odir);
+    
+    //要发布到cms的文件
+    if(cmsUtil && !util.isPreserved(base)){
+        var tmp = util.readWork(fullname);
+        tmp = tmp.replace(/<!--\s*<meta.*?-->/ig, '');
+        //复制到发布预处理目录
+        if (/<meta\s*name="cms_id".*?content="\d{4}\S+?"/i.test(tmp)) {
+            odir = util.getFolder(`${util.distCmsDir}/${dir}`);
+            log(`Prepare CMS Page: ${fullname}\n`);
+            util.cpFile(fullname, odir);
+        }
+    }
+    
 }

@@ -11,7 +11,6 @@ var conf = util.conf;
 var $$ = require('../lib/bowlder');
 var Store = require('../lib/store');
 var project = ENV.GO_PIPELINE_NAME;
-var svnver = ENV.GO_REVISION || 1;
 var stage = ENV.GO_STAGE_NAME;
 var log = util.log;
 var vc = util.vc;
@@ -45,15 +44,18 @@ exports.incparseDir = async function(dir){
             return;
         }
         if(fs.existsSync(file)){
+            if(util.isPreserved(file)){
+                return;
+            }
             var html = util.readWork(file);
             log(`incparseHtml ${file}:\n`);
             util.stack("出错文件: "+file);
             //对于非ssi碎片，改变fulldir时所用的相对路径
             var fileFromRoot = file.replace(new RegExp(util.tmpDir + '/.*?/'), '');
             if(relativeRoot[fileFromRoot]){
-                global.SVNPATH = relativeRoot[fileFromRoot];
+                global.VCPATH = relativeRoot[fileFromRoot];
             }else if(/\//.test(fileFromRoot) && /<html|#header/i.test(html)){
-                global.SVNPATH = path.resolve(vc.path, fileFromRoot);
+                global.VCPATH = path.resolve(vc.path, fileFromRoot);
             }
             curfile = file;
             if(/\.(s?html|vm)$/.test(file)){
@@ -63,17 +65,17 @@ exports.incparseDir = async function(dir){
             }
             log(`incparseHtml ${file} done.\n`);
             util.writeTmp(file, html);
-            global.SVNPATH = vc.path;
+            global.VCPATH = vc.path;
             util.stack([]);
         }
     }));
 }
 
 var incparseJson = exports.incparseJson = async function(str, name){
-    var oSVNPATH = global.SVNPATH;
+    var oVCPATH = global.VCPATH;
     var fileFromRoot = name.replace(vc.path + "/", "");
     if(fileFromRoot && relativeRoot[fileFromRoot]){
-        global.SVNPATH = relativeRoot[fileFromRoot];
+        global.VCPATH = relativeRoot[fileFromRoot];
     }
     name = name.replace(/(\S+\/|\.json$)/g, '');
     log(`处理JSON配置: ${name}\n`);
@@ -97,7 +99,7 @@ var incparseJson = exports.incparseJson = async function(str, name){
             global.exitERR("JSON文件解析出错：$name");
         }
     }
-    global.SVNPATH = oSVNPATH;
+    global.VCPATH = oVCPATH;
     return util.quoteAddr2Cdn(str) + garbage;
 }
 
@@ -219,17 +221,34 @@ var incparseHtml = exports.incparseHtml = async function(html, file){
     });
     html = await util.replaceAsync(html, /<script([^>]*?)>\s*<\/script>(\s*)/ig, (all, m1, m2) => incparseJs(m1,m2,groups));
     html = await util.replaceAsync(html, /<link([\s\S]*?)>(\s*)/ig, (all, m1, m2) => incparseCss(m1,m2,groups));
-    html = html.replace(/<img\s([\s\S]*?)>/ig, (all, m1) => util.procImg(m1));
-    html = html.replace(/#\burl\s*\(\s*(['"]?)\s*([^\s'"]+?)\s*\1\s*\)/g, (all, m1, m2) => util.safeCdnImgPath(all, m2));
-    html = html.replace(/<\/style>\s*<style>/g, "");
+    html = html.replace(/<img\s+([\s\S]*?)>/ig, (all, m1) => procImg(m1));
     return util.quoteAddr2Cdn(html);
+}
+
+function procImg(tmp){
+    var start_time = +new Date;
+    if (/src=(['"])\s*(\S+?)\s*\1/i.test(tmp)) {
+        var sep = RegExp.$1;
+        var src = RegExp.$2;
+        var osrc = util.quotemeta(src);
+        //[图片链接]  ${imgurl}
+        if (/[\s\+'"\{\$]/.test(src)) {
+            return `<img ${tmp}>`;
+        }
+        var url = util.cdnImgPath(src, '.');
+        if(src != url){
+            log(`  procImg: ${src} => ${url}\n`);
+            tmp = tmp.replace(new RegExp(`src\\s*=\\s*${sep}\\s*${osrc}\\s*${sep}`, 'i'), "src="+sep+url+sep);
+        }
+    }
+    return `<img ${tmp}>`;
 }
 
 var incparseCss = async function(tmp, spaces, groups) { //多个link合并时，将第一个link替换为合并后的css，其余删除
     var print = '';
     var group = '';
     var csscount = 0;
-    if(/href=(['"])(\S+)\1/.test(tmp)){
+    if(/href\s*=\s*(['"])\s*(\S+)\s*\1/.test(tmp)){
         var sep = RegExp.$1;
         var src = RegExp.$2;
         var osrc = util.quotemeta(src);
@@ -243,7 +262,7 @@ var incparseCss = async function(tmp, spaces, groups) { //多个link合并时，
                 print = RegExp.$2;
             } else if(!/ (_group|_drop|_keep)/.test(tmp)){
                 if (ENV.PRINT_CSS ||
-                    (projectJson.skipRes && /static\.f2e\.netease|qa\.developer\.163/.test(src) && !/analysis/.test(url))){
+                    (projectJson.skipRes && !/analysis/.test(url))){
                     print = 1;
                 }
             }
@@ -279,7 +298,7 @@ var incparseCss = async function(tmp, spaces, groups) { //多个link合并时，
         }
         url = util.cdnpath(url);
         if (url) {
-            tmp = tmp.replace(new RegExp(`href=${sep}\\s*${osrc}\\s*${sep}`), "href="+sep+url+sep);
+            tmp = tmp.replace(new RegExp(`href\\s*=\\s*${sep}\\s*${osrc}\\s*${sep}`), "href="+sep+url+sep);
             tmp = tmp.replace("stylesheet/less", "stylesheet");
         }
         if (/\.less['"]/.test(tmp)) {
@@ -313,7 +332,7 @@ var incparseJs = exports.incparseJs = async function(tmp, spaces, groups) { //�
         } else if(!/ (_group|_drop|_keep)/.test(tmp)){
             //PRINT_JS 可强制要求将页面所有js内联输出
             if (ENV.PRINT_JS ||
-                (projectJson.skipRes && /static\.f2e\.netease|qa\.developer\.163/.test(src) && !/analysis|\/collect_dev\//.test(url))) {
+                (projectJson.skipRes && !/analysis/.test(url))) {
                 print = 1;
             }
         }
@@ -374,7 +393,7 @@ async function jspack(arr, group, force){
     // 单独文件不作合并
     if(!force && !projectJson.skipRes && count == 1){
         var singlepath = util.cdnpath(arr[0]);
-        if(singlepath.indexOf(conf.devHost) == -1){
+        if(!conf.devHost || singlepath.indexOf(conf.devHost) == -1){
             return singlepath;
         }
     }
@@ -429,7 +448,7 @@ async function jspack(arr, group, force){
         stmts.addJs.run(js_ver, files, +new Date);
         global.cdnCount ++;
         packedJsUrl = conf.cdns[0].base + `/${vc.cdnfix}${path}/${output}`;
-        console.log("新增"+packedJsUrl);
+        console.log("新增" + packedJsUrl);
 
         RESFILES.packFiles[shortname].cdnurl = packedJsUrl;
         RESFILES.packFiles[shortname].md5 = fullmd5;
@@ -455,7 +474,7 @@ async function csspack(arr, group, force){
     // 单独文件不作合并
     if(!force && !projectJson.skipRes && count == 1){
         var singlepath = util.cdnpath(arr[0]);
-        if(singlepath.indexOf(conf.devHost) == -1){
+        if(!conf.devHost || singlepath.indexOf(conf.devHost) == -1){
             return singlepath;
         }
     }
@@ -476,8 +495,8 @@ async function csspack(arr, group, force){
         content += "$csscontent\n";
         count += csscount - 1;
     };
-    if(global.SVNPATH){
-        var cdn_base = "http://img[1-6].cache.netease.com/f2e/"+vc.cdnfix+global.SVNPATH;
+    if(global.VCPATH){
+        var cdn_base = "http://img[1-6].cache.netease.com/f2e/"+vc.cdnfix+global.VCPATH;
         content = content.replace(new RegExp(cdn_base+"/css/", "g"), "") //相对于css/pack.xxxxx.d.css
             .replace(new RegExp(cdn_base+"/", "g"), "../"); //相对于css/pack.xxxxx.d.css
     }
@@ -531,26 +550,21 @@ function postPacked(output, list, nsize, osize, count){
 }
 
 function parseERR(err){
-    global.exitERR("incparse $curfile出错: $err。");
+    global.exitERR("[pack.base] $curfile出错: $err。");
 }
 
 async function preCssPack(tmp, url, compress){
     var count = 1;
     util.stack("出错文件: "+url);
 
-    var url_dir = path.dirname(url);
-    ENV.BASEDIR = url_dir;   //procSingleCss用
-    if (new RegExp(`(${conf.devHost}|${conf.cdns[0].base})/(.*)`).test(url_dir)) {
-        global.SVNPATH2 = RegExp.$2;     //fulldir/cdnImgPath用
-    } else {
-        global.IMGURL_ROOT = url_dir; //cdnImgPath用，非网易cdn资源
-    }
+    var cssPath = path.dirname(url);
+    global.IMGURL_ROOT = cssPath; //getcss, cdnImgPath用，非cdn资源
     [,,count, tmp] = await util.procSingleCss(undefined, compress, tmp);
 
     //处理本css内的相对url
     tmp = tmp.replace(/\burl\s*\(\s*['"]?(\S+?)['"]?\s*\)/g, (all, m1) => util.cdnImgPath(m1));
 
-    global.SVNPATH2 = global.IMGURL_ROOT = "";
+    global.IMGURL_ROOT = "";
     util.stack([]);
     return [tmp, count];
 }

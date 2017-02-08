@@ -27,7 +27,6 @@ var util = require("./lib/util4go");
 var ENV = process.env;
 var stage = ENV.GO_STAGE_NAME;
 var label = ENV.GO_PIPELINE_LABEL || 0;
-var svnver = ENV.GO_REVISION || 1;
 var project = ENV.GO_PIPELINE_NAME;
 var log = util.log;
 var vc = util.vc;

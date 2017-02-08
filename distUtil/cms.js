@@ -10,7 +10,6 @@ var queryCmsPath = require('./cmspath');
 var ENV = process.env;
 var stage = ENV.GO_STAGE_NAME;
 var label = ENV.GO_PIPELINE_LABEL || 0;
-var svnver = ENV.GO_REVISION || 1;
 var project = ENV.GO_PIPELINE_NAME;
 var log = util.log;
 var vc = util.vc;
@@ -111,7 +110,7 @@ exports.publishInc = async function(quiet){
         if (/\s*<meta\s+name\s*=\s*"cms_id"\s+content="\d{4}\S+?"/i.test(content)) {
             var dir = path.dirname(file);
             var odir = util.getFolder(`${distCmsDir}/${dir}`);
-            util.execSync(`cp ${incDir}/${file} ${odir}/`);
+            util.cpFile(`${incDir}/${file}`, odir);
         }
 
         modelid = getIncName(file);

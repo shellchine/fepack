@@ -1,7 +1,7 @@
 //根据频道id和svn文件路径查找线上的cms ssi路径
 var fs = require('fs');
 var path = require('path');
-var conf = require('../conf');
+var conf = require('../' + (ENV.GO_CONFIG || 'conf'));
 var request = require('request');
 var ENV = process.env;
 

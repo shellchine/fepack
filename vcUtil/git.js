@@ -16,7 +16,7 @@ if(!fs.existsSync(authFile)){
 git.auth = fs.readFileSync(authFile).toString().trim();*/
 git.auth = "";
 git.cdnfix = "";
-git.path = ENV.SVNPATH || "";
+git.path = ENV.VCPATH || "";
 git.host = git.host.replace(/\/$/, '');
 if(!ENV.GO_TEST){
     var tmp = proc.execSync(`git remote -v`, {encoding: "utf-8"});

@@ -16,7 +16,7 @@ if(!fs.existsSync(authFile)){
 svn.auth = fs.readFileSync(authFile).toString().trim();
 svn.auth += " --no-auth-cache --non-interactive --trust-server-cert";
 svn.cdnfix = "";
-svn.path = ENV.SVNPATH;
+svn.path = ENV.VCPATH;
 svn.host = svn.host.replace(/\/$/, '');
 if(!ENV.GO_TEST){
     var tmp = proc.execSync(`svn info ${svn.auth}`, {encoding: "utf-8"});

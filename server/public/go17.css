@@ -1,0 +1,68 @@
+h2 input{font-size:13px;color:#555}
+h2 .svnpath{width:220px}
+.f2e-tools-wrap{position: absolute;right: 5px;top:53px;z-index:9}
+.f2e-tools-wrap select{width:auto}
+.quickadd_link{font-size:13px;margin-left:20px;color:#667;cursor:pointer}
+.quickadd_form{visibility:hidden;font-size:13px;color:#667;display:inline-block;*display:inline;*zoom:1;margin-left:20px}
+.quickadd_msg img{vertical-align:middle}
+.quickadd_form select{font-size:13px;padding:0;width:auto}
+.quickadd_form input:focus{ box-shadow:none;background:#eee;border-color: #788280; }
+.pipeline_edit_addon{ float:right;margin-right:15px;color:#666 }
+.pipeline_edit_addon input[type="file"],.pipeline_edit_addon input[type="file"]:focus,.pipeline_edit_addon input[type="file"]:active{ border:none;color:#eee;width:160px;box-shadow:none; }
+.pipeline_vars_conf{display:inline-block;margin:0 8px;width: 22px;height:22px;background: url(http://61.135.251.13:8153/go/images/andare/ico-16x16.png) no-repeat 0 -205px;cursor:pointer;vertical-align: middle;}
+.js_labeldir_form{float:none;margin-left:10px;display: inline-block;}
+.js_labeldir_form input[type=text]{width:50px;padding:4px;background: #ccc;}
+.js_labeldir_form input[type=text]:focus{background: #FFF;}
+.js_labeldir_form img{vertical-align: middle;}
+.new_manager_btn{ line-height:30px;color:#666 }
+.new_manager_btn:hover{color:#333  }
+.new_manager_form{ line-height:28px }
+.new_manager_form input{ font-size:12px }
+.new_manager_form input[type='button']{ padding:1px 3px }
+.list_table tr.pipeline{ display:none }
+.html_report{ border:none;width:100%;height:500px;}
+.user .go_change_pwd_form{ display:none }
+.user .on{ position:relative;color:#000 }
+.application_nav .change_pwd{ margin-top:9px; }
+.on .go_change_pwd_form{ display:block;position:absolute;z-index:1}
+.go_change_pwd_form .status{ float:right;margin:12px 12px 0 0;color:#f22; }
+.go_change_pwd_form .success{ color:#0000ff }
+#pipelines .pipelines_selector .search-with-clear #pipeline-search{margin:0}
+#stages .build_cause .change { border:none;margin:0 }
+.go_change_pwd_form {
+  position:absolute; right:0;top:22px;
+  box-shadow: inset 0 0 5px #DDD;
+  background: white;
+  padding: 15px;
+  border: 1px solid #DDD;
+  border-radius: 6px;
+  width: 260px;
+}
+.go_change_pwd_form div {
+  overflow: hidden;
+}
+.go_change_pwd_form label {
+  float: left;
+  width: 60px;
+  line-height: 30px;
+}
+.go_change_pwd_form input {
+  width: 190px;
+  box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+  -ms-box-sizing: border-box;
+  border: 1px solid #CCC;
+  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+  -moz-box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+  -webkit-box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+}
+.go_change_pwd_form a.submit {
+  background: #444444 url(images/overlay_gradient_button.png) repeat-x bottom left;
+  border-radius: 4px;
+  box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.2);
+  padding: 5px 15px;
+  color: #fff;
+  margin: 8px 10px 0 0;
+  float: right;
+}

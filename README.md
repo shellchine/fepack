@@ -19,6 +19,10 @@ module.exports = {
     pack: ["base", "bdc"],
     devDist: ["omad"],
     dist: ["cdn", "rsync", "cms", "omad"],
+    files: {
+        exclude: /\.(avi|mpeg|psd)$/,
+        preserve: /\.(php|jsp|asp)$/
+    },
     cdns: [
         {
             base: "http://img2.cache.netease.com/f2e",
