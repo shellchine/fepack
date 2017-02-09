@@ -9,6 +9,7 @@ var depack = require('./depack');
 
 program
     .version(conf.version)
+    .option('-c, --conf [conf]', 'Specify the express config file')
     .option('-l, --list [list]', 'Specify the replace rule file')
     .option('-p, --port [port]', 'Specify the port nproxy will listen on(8989 by default)', parseInt)
     .option('-d, --debug', 'Enable debug mode')
@@ -25,7 +26,7 @@ var app = express();
 var expressPort = port + 1;
 app.use(express.static(__dirname + '/public'));
 
-require('./go')(app);
+require('./go')(app, program.conf);
 
 app.get('/nproxy/:url', function(req, res) {
     

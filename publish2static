@@ -56,7 +56,7 @@ var lintUtils = $$.map(conf.lint, arr=>$$.map(name=>{
 //数据目录
 var infoDir = util.infoDir;
 var Reporter = require("./lib/reporter");
-var reporter = util.reporter = new Reporter("publish2static", `${infoDir}/dev.html`);
+var reporter = util.reporter = new Reporter("publish2static", `dev.html`);
 //备份目录
 var backupDir = util.backupDir;
 //临时目录
@@ -156,7 +156,7 @@ util.printTime();
     if(!/devQA/i.test(stage)){
 
         // 6. 扩展相对路径(仅后端项目)
-        if (util.backendID || projectJson[cloudEnv] || ENV[cloudEnv]) {
+        if (util.syncTo || projectJson[cloudEnv] || ENV[cloudEnv]) {
             log(`处理${htmlDir}目录(parseSSI)`, 2, 1);
             parseSSI(htmlDir);     //内联所有外部ssi
             //扩充相对路径，默认基于项目根目录
@@ -175,9 +175,9 @@ util.printTime();
 
     }
 
-    var rDir = util.rsyncDir.static;
     // rsync同步到后端服务器(非云主机)
-    if (util.backendID || projectJson[cloudEnv] || ENV[cloudEnv]) {
+    if (util.syncTo || projectJson[cloudEnv] || ENV[cloudEnv]) {
+        var rDir = util.syncTo.static;
         util.proc4backend(htmlDir, rDir);
     }
 
@@ -348,8 +348,8 @@ function parseSSI(path){ //替换跨频道SSI
         var content = readWork(file);
         log(`处理${f}中的SSI..`);
         var relroot = file.replace(vc.localhost, '/');
-        if(util.backendID){  //cms项目不需要预内联
-            content = content.replace(/<!--#include\s+(file|virtual)\s*=\s*(["'])((\/|widget|modules|\.\.\/)\S*?)\2\s*-->/ig, (all, m1, m2, m3) => inlineSSI(m3, relroot));   //内联所有跨项目的ssi(/、modules、widget或../开头都要替换)
+        if(util.syncTo && conf.vc.type != 'git'){   //内联所有跨项目的ssi(/、modules、widget或../开头都要替换)
+            content = content.replace(/<!--#include\s+(file|virtual)\s*=\s*(["'])((\/|widget|modules|\.\.\/)\S*?)\2\s*-->/ig, (all, m1, m2, m3) => inlineSSI(m3, relroot));
         }
         content = content.replace(/ _group="\S+"/g, '');
 

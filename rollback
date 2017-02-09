@@ -38,7 +38,7 @@ $$.each(conf.dist, name=>{
 });
 
 var Reporter = require("./lib/reporter");
-var reporter = util.reporter = new Reporter("rollback", `${util.infoDir}/rollback.html`);
+var reporter = util.reporter = new Reporter("rollback", `rollback.html`);
 
 //1. 回滚cdn文件映射表($infoDir/.curfiles)
 var backupFile = `${util.backupDir}/info.${label}.tar.gz`;
@@ -59,9 +59,9 @@ execSync(`cd ${util.distHtmlDir};tar zmxf ${backupFile};cp ${backupFile} ../html
 reporter.set("tarLink", `${conf.devHost2}/dist/${project}/html.tar.gz`);
 
 //2.1 回滚到后端
-if (util.backendID) {
-    var rDir = /simu|QA/i.test(stage) ? util.rsyncDir.static : util.rsyncDir.live;
-    util.rsync2backend(util.distHtmlDir, rDir);
+if (util.syncTo) {
+    var rDir = /simu|QA/i.test(stage) ? util.syncTo.static : util.syncTo.live;
+    util.sync2backend(util.distHtmlDir, rDir);
 }
 `cd $rsyncTmpDir; tar zcf $incdir/../html.tar.gz *`;
 log(`成功回滚到版本 ${label} .\n`);

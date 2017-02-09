@@ -418,7 +418,7 @@ async function jspack(arr, group, force){
     }
     var shortname = `${path}/${shortid}`;
 
-    var js_ver = (await stmts.jsCount.get(shortname)).CN || 0;
+    var jsVer = (await stmts.jsCount.get(shortname)).CN || 0;
     var packedJsUrl;
     var fullmd5 = util.getMd5(content);
     if(!RESFILES.packFiles[shortname]){
@@ -427,15 +427,15 @@ async function jspack(arr, group, force){
     if(uniqueProject[project]
        || (ENV.HTTPS_CDN && !/https:/.test(RESFILES.packFiles[shortname].cdnurl))
        || fullmd5 != RESFILES.packFiles[shortname].md5){
-        js_ver ++;
+        jsVer ++;
 
         var output, jsDir = util.getFolder(util.distStaticDirs[0]+"/js");
         if (uniqueProject[project]) { //短名
             output = shortid+".js";
         } else {
-            output = `${shortid}.${js_ver}.js`;
+            output = `${shortid}.${jsVer}.js`;
         }
-        if (ENV.JS_COMPRESS == 0) {
+        if (!conf.compress.js) {
             util.writeTmp(`${jsDir}/${output}`, content);
         } else {
             util.compressJs(content, `${jsDir}/${output}`, {
@@ -445,7 +445,7 @@ async function jspack(arr, group, force){
         osize = content.length;
         nsize = fs.statSync(`${jsDir}/${output}`).size;
 
-        stmts.addJs.run(js_ver, files, +new Date);
+        stmts.addJs.run(jsVer, files, +new Date);
         global.cdnCount ++;
         packedJsUrl = conf.cdns[0].base + `/${vc.cdnfix}${path}/${output}`;
         console.log("新增" + packedJsUrl);
@@ -458,7 +458,7 @@ async function jspack(arr, group, force){
         }
     }else{
         //没有变化
-        var output = `${shortid}.${js_ver}.js`;
+        var output = `${shortid}.${jsVer}.js`;
         console.log(output + "没有变化");
         packedJsUrl = conf.cdns[0].base+`/${vc.cdnfix}${path}/${output}`;
     }
@@ -506,7 +506,7 @@ async function csspack(arr, group, force){
     var shortid = group+"."+md5;
     var shortname = path+"/"+shortid;
 
-    var css_ver = (await stmts.cssCount.get(shortname)).CN || 0;
+    var cssVer = (await stmts.cssCount.get(shortname)).CN || 0;
     content = util.toAscii(content);
     var cssPackedUrl;
     var fullmd5 = util.getMd5(content);
@@ -514,13 +514,13 @@ async function csspack(arr, group, force){
         RESFILES.packFiles[shortname] = {};
     }
     if((ENV.HTTPS_CDN && !/https:/.test(RESFILES.packFiles[shortname].cdnurl))|| fullmd5 != RESFILES.packFiles[shortname].md5){
-        css_ver ++;
+        cssVer ++;
         var cssDir = util.getFolder(`${util.distStaticDirs[0]}/css`);
-        var output = `${shortid}.${css_ver}.css`;
+        var output = `${shortid}.${cssVer}.css`;
         util.compressCss(content, `${cssDir}/${output}`);
         osize = content.length;
         nsize = fs.statSync(`${cssDir}/${output}`).size;
-        stmts.addCss.run(shortname, css_ver, files, +new Date);
+        stmts.addCss.run(shortname, cssVer, files, +new Date);
         //$files: static.f2e下文件列表
 
         global.cdnCount ++;
@@ -530,7 +530,7 @@ async function csspack(arr, group, force){
         RESFILES.packFiles[shortname].cdnurl = cssPackedUrl;
         RESFILES.packFiles[shortname].md5 = fullmd5;
     }else{
-        var output = `${shortid}.${css_ver}.css`;
+        var output = `${shortid}.${cssVer}.css`;
         console.log(output+"没有变化");
         cssPackedUrl = util.distStaticDirs[0] + `/${vc.cdnfix}${path}/${output}`;
     }

@@ -16,6 +16,10 @@ module.exports = {
     pack: ["base"],
     devDist: ["omad"],
     dist: ["cms", "omad", "scp"],
+    compress: {
+        js: 2,
+        css: 1
+    },
     files: {
         exclude: /\.(avi|mpeg|psd)$/,
         preserve: /\.(php|jsp|asp|xml|min\.js|min\.css)$/
@@ -33,6 +37,17 @@ module.exports = {
             ftp: "61.135.251.56:16321",
             authFile: ".ftpauth"
         }
+    ],
+    syncs: [
+        {type: "cp", base: "/var/f2e_inc"},
+        {type: "cp", base: "/var/f2e_inc", devOnly: true},
+        {type: "cp", base: "/var/auto_inc"},
+        {type: "cp", base: "/var/auto_inc", devOnly: true},
+        {type: "cp", base: "/var/house_inc"},
+        {type: "cp", base: "/var/house_inc", devOnly: true},
+        {type: "cp", base: "/var/recm_inc"},
+        {type: "cp", base: "/var/recm_inc", devOnly: true},
+        {type: "cp", base: "/var/video_inc"}
     ],
     cdnRootDir: "/f2e"
 }

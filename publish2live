@@ -50,7 +50,7 @@ var writeWork = util.writeWork;
 //数据目录
 var infoDir = util.infoDir;
 var Reporter = require("./lib/reporter");
-var reporter = util.reporter = new Reporter("publish2live", `${infoDir}/live.html`);
+var reporter = util.reporter = new Reporter("publish2live", `live.html`);
 var packUtils = {};
 $$.each(conf.pack, name=>{
     packUtils[name] = require("./packUtil/" + name);
@@ -120,8 +120,8 @@ var projectJson = util.projectJson;
     // 8. RSYNC同步到后端服务器
     upload2ImgCdn(1); //上传静态资源到cdn
     
-    var rDir = /simu|QA/i.test(stage) ? util.rsyncDir.static : util.rsyncDir.live;
-    if (util.backendID){
+    if (util.syncTo){
+        var rDir = /simu|QA/i.test(stage) ? util.syncTo.static : util.syncTo.live;
         util.proc4backend(htmlDir, rDir);
     }
     // 10. 打包页面文件
@@ -138,9 +138,9 @@ var projectJson = util.projectJson;
                 execSync(`mv ${backupFile} ${util.backupDir}/html.${label}.${time}.tar.gz`);
             }
             util.cpFile(`${util.distDir}/html.tar.gz`, backupFile);
-            if(util.rsyncDir.backup){
-                util.getFolder(util.rsyncDir.backup);
-                util.cpFile(backupFile, util.rsyncDir.backup);
+            if(util.syncTo.backup){
+                util.getFolder(util.syncTo.backup);
+                util.cpFile(backupFile, util.syncTo.backup);
             }
         }
     }
