@@ -2,7 +2,7 @@ var fs = require('fs');
 var path = require('path');
 var request = require('request');
 var Store = require('../lib/store');
-var $$ = require('./lib/bowlder');
+var $$ = require('../lib/bowlder');
 
 var host = "http://127.0.0.1:8153";
 
@@ -16,7 +16,7 @@ module.exports = function(app, file){
         getPartners: goDb.prepare("select manager from pipelines where name=?"),
         setPartners: goDb.prepare("update pipelines set manager=? where name=?"),
         delProject: goDb.prepare("delete from pipelines where name=?"),
-        addProject: goDb.prepare("insert into pipelines values(?, ?, ?, ?)")
+        addProject: goDb.prepare("insert into pipelines values(?, ?, ?, ?, ?)")
     }
 
     app.get('/go/list', function(req, res) { //获取概览信息
@@ -52,7 +52,7 @@ module.exports = function(app, file){
         })();
     });
 
-    app.post('/go/create/:type', function(req, res) { //创建项目
+    app.post('/go/create/:type', async function(req, res) { //创建项目
         var type = req.params.type;
         var user = req.query.user;
         var vcpath = req.query.vcpath;
@@ -82,20 +82,26 @@ module.exports = function(app, file){
             omad: ''
         }, null, '');
 
-        request.post({
-            url: `${host}/go/tab/admin`,
-            headers: {
-                
-            }
-        }, async function(err, response, body){
-            await request()
-            await stmts.delProject.run(project);
-            await stmts.addProject.run(project, vcpath, user, user, type);
+        await post(`${host}/go/auth/security_check`, {
+            j_password: auth[1],
+            j_username: auth[0]
+        });
+        var [conf, xml] = getXmlConf(await get(`${host}/go/admin/config_xml/edit`));
+        if(xml.indexOf(`<pipeline name="${project}">`) != -1){
             res.jsonp({
-                status: "success",
-                msg: "添加项目成功"
+                "msg":`已存在项目名 ${project}`,
+                "status":"failed"
             });
-        }).auth(auth[0], auth[1]);
+        }else{
+            conf["go_config[content]"] = xml.replace(/(?:\s*<\/pipelines>)/, "\n"+pipelineXml);
+        }
+        await post(`${host}/go/admin/config_xml`, conf);
+        await stmts.delProject.run(project);
+        await stmts.addProject.run(project, vcpath, user, user, type);
+        res.jsonp({
+            status: "success",
+            msg: "添加项目成功"
+        });
     });
 
     app.post('/go/user/chpwd', function(req, res) { //修改密码
@@ -142,4 +148,51 @@ module.exports = function(app, file){
         })();
     });
 
+}
+
+function post(url, conf){
+    conf = $$.extend({jar: true}, conf);
+    return new Promise((resolve, reject) => {
+        request.post(url, conf, function(err, res, body){
+            if(err){
+                reject(err);
+            }else{
+                resolve(body);
+            }
+        })
+    });
+}
+
+
+function get(url, conf){
+    conf = $$.extend({jar: true}, conf);
+    return new Promise((resolve, reject) => {
+        request.get(url, conf, function(err, res, body){
+            if(err){
+                reject(err);
+            }else{
+                resolve(body);
+            }
+        })
+    });
+}
+
+function getXmlConf(content){
+    var md5, xml, token;
+    if(/"go_config\[md5\]".*?value="(.*?)"/.test(content)){
+        md5 = RegExp.$1;
+    }
+    if(/"go_config\[content\]".*?>\s*([\s\S]*?)<\/textarea>/.test(content)){
+        xml = RegExp.$1.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+    }
+    if(/"authenticity_token".*?value="(.*?)"/.test(content)){
+        token = RegExp.$1;
+    }
+    return [{
+        _method: "put",
+        authenticity_token: token,
+        ommit: "SAVE",
+        active: "configuration",
+        "go_config[md5]": md5
+    }, xml];
 }

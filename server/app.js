@@ -26,6 +26,13 @@ var app = express();
 var expressPort = port + 1;
 app.use(express.static(__dirname + '/public'));
 
+app.all('/go/*', function(req, res, next) {  
+    res.header("Access-Control-Allow-Origin", "*");  
+    res.header("Access-Control-Allow-Headers", "X-Requested-With");  
+    res.header("Access-Control-Allow-Methods","PUT,POST,GET,DELETE,OPTIONS");
+    next();  
+});  
+
 require('./go')(app, program.conf);
 
 app.get('/nproxy/:url', function(req, res) {
@@ -48,5 +55,5 @@ app.get('/nproxy/:url', function(req, res) {
 });
 
 http.createServer(app).listen(expressPort, function() {
-    console.log("Proxy started on port ", expressPort);
+    console.log("Express started on port ", expressPort);
 });

@@ -136,7 +136,7 @@
                     return;
                 }
                 scope.msg.partner = '<img src="http://img2.cache.netease.com/auto/projects/club/v1.1/default/images/loadings.gif">';
-                $.post(`${apiPath}/go/addpartner/${pipename}?callback=?`, {
+                $.post(`${apiPath}/go/addpartner/${pipename}`, {
                     newpartner: newPartner
                 },function(json){
                     if(json['status'] == 'success'){
@@ -149,7 +149,7 @@
             }
 
             $.async(function*(){
-                scope.partners = yield $.getJSON(`${apiPath}/go/partners/${pipename}?callback=?`);
+                scope.partners = yield $.getJSON(`${apiPath}/go/partners/${pipename}`);
                 scope.showPartners = false;
                 var $wrapper = $(`<div class="f2e-tools-wrap"><div class="pipeline-edit-addon">
               <a class="new-manager-btn" go-show="!showPartners" go-click="showPartners=!showPartners">添加合作者</a>
@@ -164,7 +164,7 @@
 
         function getInfo(cb){
             $.async(function*(){
-                var json = yield $.getJSON(apiPath + "/go/list?callback=?");
+                var json = yield $.getJSON(apiPath + "/go/list");
                 $.extend(scope, json);
                 if(json.admins[user]) {
                     //显示管理入口

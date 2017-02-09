@@ -8,29 +8,8 @@ var ENV = process.env;
 var cache = {};
 var cacheDir = conf.cacheDir || "/tmp/fepack";
 
-//所有项目路径
-var allPaths = {};
-var tmp = fs.readFileSync("/var/www/go/path.conf").toString();
-tmp.split(/\n/).forEach(line => {
-    if(/(\S+)\s+(\S+)/.test(line)){
-        allPaths[RegExp.$1] = RegExp.$2;
-    }
-});
-
-module.exports = function(channel, file){
-    file = file.replace(new RegExp(`^(${conf.devHost})?/+`), "");
-    var projectName = path.dirname(file);
-    var arr = file.split('/');
-    for(var i = 1; i < arr.length; i ++){
-        var subdir = arr.slice(0, -i).join('/');
-        if(allPaths[subdir]){
-            projectName = allPaths[subdir];
-            file = arr.slice(-i).join("/");
-            break;
-        }
-    }
-    projectName = projectName.replace(/\//g, '_');
-
+module.exports = function(channel, arr){
+    var [projectName, file] = arr;
     var config = `${cacheDir}/info/${projectName}/.cms.addrs`;
     if (!fs.existsSync(config)) {
         return '';

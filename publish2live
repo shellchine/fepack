@@ -78,6 +78,7 @@ var readHtml = read.bind(null, htmlDir);
 var writeHtml = write.bind(null, htmlDir);
 var projectJson = util.projectJson;
 (async function(){
+    await util.promise;
     if (!/Live/.test(stage)) {         //publishStage, publishQAStage
         // 1. ~ 4.
         await cp4live();

@@ -21,7 +21,7 @@
               <tab name="Lint" path="gohtml/dev.html" />
             </tabs>
             <artifacts>
-              <artifact src=".go/dev.html" dest="gohtml" />
+              <artifact src="cruise-output/dev.html" dest="gohtml" />
             </artifacts>
           </job>
         </jobs>
@@ -37,7 +37,7 @@
               <tab name="Files" path="gohtml/live.html" />
             </tabs>
             <artifacts>
-              <artifact src=".go/live.html" dest="gohtml" />
+              <artifact src="cruise-output/live.html" dest="gohtml" />
             </artifacts>
           </job>
         </jobs>
@@ -53,7 +53,7 @@
               <tab name="RollBack" path="gohtml/rollback.html" />
             </tabs>
             <artifacts>
-              <artifact src=".go/rollback.html" dest="gohtml" />
+              <artifact src="cruise-output/rollback.html" dest="gohtml" />
             </artifacts>
           </job>
         </jobs>

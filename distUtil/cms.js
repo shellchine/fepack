@@ -459,7 +459,7 @@ function getCmspath(file){
         }
     });
     //注：不存在的ssi直接返回''
-    return cmspath || queryCmsPath(channel, file);
+    return cmspath || queryCmsPath(channel, util.findProject(file));
 }
 
 function getCmsPath4Inc(modelname){

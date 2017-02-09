@@ -139,6 +139,7 @@ if(!/devQA/i.test(stage)){
 util.printTime();
 
 (async function(){
+    await util.promise;
     log("复制源代码", 2, 1);
     await util.wander(function(dir){
         return util.isValidDir(dir);
