@@ -2,8 +2,26 @@
 // shellchine@163.com
 
 (function($){
+    $.async = function(gen){
+        var fn = gen();
+        return new Promise(resolve => {
+            var step = function(val){
+                var result = fn.next(val);
+                if(result.done){
+                    resolve(result.value);
+                }else{
+                    var p = result.value;
+                    if(typeof p == 'function') p(step);
+                    else{
+                        if(!p || typeof p.then != 'function') p = Promise.resolve(p);
+                        p.then(step);
+                    }
+                }
+            }
+            step();
+        });
+    }
     var host = location.origin.replace(/:\d+|$/, ":8990");
-    var apiPath = host + "/go";
     $("head").append(`<link type="text/css" rel="stylesheet" href="${host}/go17.css" />`);
 
     var stagePath, pipename, pageType = (function(){ //当前页面类型: index/overview/history
@@ -20,18 +38,21 @@
         return 'index';
     })();
     
-    $.async(function(){ //各类页面初始化
+    $.async(function*(){ //各类页面初始化
         yield $.getScript(host + "/utils.js");
         yield $.getScript(host + "/goconf.js");
         var scope = window.goConf;
         scope.groups.forEach(group => {
             group.dir2dest = {};
-            $.each(scope.channels, function(key, info){
-                var channelInfo = info.split(/,/);
-                for(var i = 1; i < channelInfo.length; i ++){
-                    group.dir2dest[channelInfo[i]] = key;
+            var list = [];
+            $.each(group.list, function(key, info){
+                var arr = info.split(/,/);
+                for(var i = 1; i < arr.length; i ++){
+                    group.dir2dest[arr[i]] = key;
                 }
+                list.push({label: arr[0], value: key});
             });
+            group.list = list;
         });
         scope.msg = {};
         var user = trim($(".current_user_name").html());
@@ -77,15 +98,15 @@
         }
 
         function initChgPwd(){ //详情页: 修改密码
-            var $chgPwd = $(`<li class="change_pwd">
+            var $chgPwd = $(`<li class="change-pwd">
                 <a go-click="showChgPwd()">修改密码</a>
                 <form class="go-change-pwd-form">
                 <div><label>旧密码：</label><input type="password" /></div>
                 <div><label>新密码：</label><input type="password" /></div>
                 <div><label>确认密码：</label><input type="password" /></div>
                 <a class="submit" go-click="chgPwd()">提交</a>
-                <div class="status" go-html="msg.chgPwd" go-class="chgSuccess?'success':''"></div></form></li>`).compile();
-            $chgPwd.prependTo($("#header .user"));
+                <div class="status" go-html="msg.chgPwd" go-class="chgSuccess?'success':''"></div></form></li>`).compile(scope);
+            $chgPwd.click(function(){return false}).prependTo($("#header .user"));
             var $chgPwdInputs = $chgPwd.find("input");
             $("body").click(function(e){
                 $chgPwd.removeClass("on");
@@ -95,7 +116,6 @@
                 $chgPwdInputs.val('');
                 scope.msg.chgPwd = '';
                 scope.chgSuccess = false;
-                return false;
             };
             scope.chgPwd = function(){
                 scope.msg.chgPwd = '';
@@ -106,7 +126,7 @@
                 }else if($chgPwdInputs[1].value != $chgPwdInputs[2].value){
                     scope.msg.chgPwd = "新密码前后不一致";
                 }else{
-                    $.post(`${apiPath}/go/user/chpwd`, {
+                    $.post(`${host}/go/user/chpwd`, {
                         user : user,
                         oldpw : $.b64_sha1($chgPwdInputs[0].value),
                         newpw : $.b64_sha1($chgPwdInputs[1].value)
@@ -120,7 +140,7 @@
                         }else if(json.msg){
                             scope.msg.chgPwd = json.msg;
                         }
-                        scope.$refresh();
+                        $chgPwd.$refresh();
                     });
                 }
             };
@@ -129,27 +149,26 @@
         function initPartners(){ //历史页：添加合作者
             if($("#tab-content-of-pipeline-groups").length) return;
 
-            scope.addPartner = function(){
-                var newPartner = (scope.newPartner || "").trim();
-                if(!newPartner){
-                    alert("请选择合作者。");
-                    return;
-                }
-                scope.msg.partner = '<img src="http://img2.cache.netease.com/auto/projects/club/v1.1/default/images/loadings.gif">';
-                $.post(`${apiPath}/go/addpartner/${pipename}`, {
-                    newpartner: newPartner
-                },function(json){
-                    if(json['status'] == 'success'){
-                        scope.msg.partner = json.msg || '合作者添加成功。';
-                    }else if(json.msg){
-                        scope.msg.partner = json.msg;
-                    }
-                    scope.$refresh();
-                });
-            }
-
             $.async(function*(){
-                scope.partners = yield $.getJSON(`${apiPath}/go/partners/${pipename}`);
+                scope.addPartner = function(){
+                    var newPartner = (scope.newPartner || "").trim();
+                    if(!newPartner){
+                        alert("请选择合作者。");
+                        return;
+                    }
+                    scope.msg.partner = '<img src="http://img2.cache.netease.com/auto/projects/club/v1.1/default/images/loadings.gif">';
+                    $.post(`${host}/go/addpartner/${pipename}`, {
+                        newpartner: newPartner
+                    },function(json){
+                        if(json['status'] == 'success'){
+                            scope.msg.partner = json.msg || '合作者添加成功。';
+                        }else if(json.msg){
+                            scope.msg.partner = json.msg;
+                        }
+                        $wrapper.$refresh();
+                    });
+                }
+                scope.partners = yield $.getJSON(`${host}/go/partners/${pipename}`);
                 scope.showPartners = false;
                 var $wrapper = $(`<div class="f2e-tools-wrap"><div class="pipeline-edit-addon">
               <a class="new-manager-btn" go-show="!showPartners" go-click="showPartners=!showPartners">添加合作者</a>
@@ -158,13 +177,13 @@
                 <select go-options="partners" go-model="newPartner"><option value="">请选择合作者</option></select>
                 <input type="button" value="确定" class="submit">
                 <input type="button" value="取消" class="cancel">
-              </div></div></div>`).compile().appendTo($(".header"));
+              </div></div></div>`).compile(scope).appendTo($(".header"));
             });
         }
 
         function getInfo(cb){
             $.async(function*(){
-                var json = yield $.getJSON(apiPath + "/go/list");
+                var json = yield $.getJSON(host + "/go/list");
                 $.extend(scope, json);
                 if(json.admins[user]) {
                     //显示管理入口
@@ -193,15 +212,15 @@
         }
         
         function initGroups(){ //首页项目分组
-            var $content = $("div#pipeline_groups_container").hide();
+            var $groups, $content = $("#pipeline_groups_container").hide();
             if($content.length == 0) return;
             getInfo(function(){
                 var pipelines = scope.pipelines;
                 var divHtmls = scope.divHtmls = {};
-                $content.find("div.pipeline").each(function(){
+                $content.find(".pipeline").each(function(){
                     var $pipeline = $(this);
                     var pipeId = $pipeline.attr("id").replace(/^pipeline_/, '').replace(/_panel/, '');
-                    var item = pipelines[pipeId];
+                    var item = pipelines[pipeId] || {group:'common', manager:'f2e'};
                     if(!item) return; //当前用户无权限
                     var groupId = item.group;
                     var manager = {};
@@ -212,7 +231,7 @@
                     }
                 });
                 
-                $content.before($($.template.parse(`<%groups.forEach(function(group,i){%>
+                $groups = $($.template.parse(`<%groups.forEach(function(group,i){%>
                     <div><div class="pipeline_bundle">
                       <div class="pipelines"><div class="content_wrapper_outer">
                         <div class="content_wrapper_inner">
@@ -220,7 +239,7 @@
                             <span class="quickadd-link" go-show="!groups[<%=i%>].show" go-click="groups[<%=i%>].show=!groups[<%=i%>].show">新建项目</span>
                             <div class="quickadd-form" go-show="groups[<%=i%>].show">代码路径: <input class="vcpath" go-blur="pathBlur(<%=i%>)" go-model="groups[<%=i%>].vcpath"/>
                               <select go-options="groups[<%=i%>].list" go-model="groups[<%=i%>].dest"><option value=""><%=group.label%></option></select> &nbsp;
-                              <input type="submit" class="quickadd-btn" value="新增" go-submit="createProject(<%=i%>)" go-hide="groups[<%=i%>].lock">
+                              <input type="submit" class="quickadd-btn" value="新增" go-click="createProject(<%=i%>)" go-show="!groups[<%=i%>].lock">
                               <input type="button" value="取消" class="cancel" go-click="groups[<%=i%>].show=false">
                               <span class="quickadd-msg" go-html="groups[<%=i%>].msg"></span>
                             </div>
@@ -229,7 +248,8 @@
                         </div>
                       </div></div>
                     </div></div>
-                    <%})%>`, scope)).compile());
+                    <%})%>`, scope)).compile(scope);
+                $content.before($groups);
             });
             scope.pathBlur = function(i){
                 var e = scope.$event, input = e.target;
@@ -242,7 +262,7 @@
             
             scope.createProject = function(i){
                 var group = scope.groups[i];
-                var url = `${apiPath}/go/create/${group.type}`;
+                var url = `${host}/go/create/${group.type}`;
                 
                 var vcpath = (group.vcpath || '').trim().replace(/\\/g, '/').replace(/^\/?(frontend)?\/?/, '').replace(/\/.*/, '');
                 if(!vcpath){
@@ -268,8 +288,9 @@
                         alert(json.msg.replace(/<br>/g, "\n"));
                         group.lock = false;
                     }
-                    scope.$refresh();
+                    $groups.$refresh();
                 });
+                $groups.$refresh();
             }
         }
         

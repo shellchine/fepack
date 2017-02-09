@@ -2,6 +2,7 @@ var goConf = {
     groups: [
         {
             type: "cms",
+            name: "CMS项目",
             label: "请选择CMS频道",
             list: {
                 '0001':'新闻频道,news,war,discovery',
@@ -48,8 +49,9 @@ var goConf = {
             }
         },
         {
-            label: "请选择后端团队",
             type: "common",
+            name: "常规项目",
+            label: "请选择后端团队",
             list: {
                 '-1' : '云部署平台',
                 '1' : '体育财经组',

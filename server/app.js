@@ -5,6 +5,7 @@ var nproxy = require('nproxy');
 var http = require('http');
 var express = require('express');
 var logger = require('morgan');
+var bodyParser = require('body-parser');
 var conf = require('../package.json');
 var depack = require('./depack');
 
@@ -26,6 +27,8 @@ var app = express();
 var expressPort = port + 1;
 app.use(logger('combined'));
 app.use(express.static(__dirname + '/public'));
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
 
 app.all('/go/*', function(req, res, next) {  
     res.header("Access-Control-Allow-Origin", "*");  

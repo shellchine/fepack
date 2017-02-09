@@ -1,7 +1,7 @@
 var request = require('request');
 var fs = require('fs');
 var path = require('path');
-var confFile = path.resolve(__dirname, 'conf');
+var confFile = path.resolve(__dirname, 'conf.js');
 if(!fs.existsSync(confFile)){
     confFile = path.resolve(__dirname, 'conf.sample');
 }

@@ -1,29 +1,10 @@
 (function($){
-    $.async = function(gen){
-        var fn = gen();
-        return new Promise(resolve => {
-            var step = function(val){
-                var result = fn.next(val);
-                if(result.done){
-                    resolve(result.value);
-                }else{
-                    var p = result.value;
-                    if(typeof p == 'function') p(step);
-                    else{
-                        if(!p || typeof p.then != 'function') p = Promise.resolve(p);
-                        p.then(step);
-                    }
-                }
-            }
-            step();
-        });
-    }
     $.fn.compile = function(scope){
         var views = [];
-        scope.$refresh = function(){
+        var $refresh = this.$refresh = function(){
             views.forEach(fn=>fn());
         }
-        return this.each(function(){
+        this.each(function(){
             var $wrap = $(this);
             $wrap.on("click", "[go-click]", function(e){
                 scope.$event = e;
@@ -31,9 +12,10 @@
                 if(action){
                     if(withFunc(action, scope) === false){
                         e.preventDefault();
+                        e.stopPropagation();
                     }
                 }
-                scope.$refresh();
+                $refresh();
             });
             $wrap.find("[go-blur]").each(function(){
                 var _val, prop = this.getAttribute("go-blur");
@@ -46,7 +28,7 @@
                 var _val, prop = this.getAttribute("go-show");
                 var $el = $(this);
                 views.push(function(){
-                    var val = withFunc(prop, scope);
+                    var val = withFunc(prop, scope) || false;
                     if(val !== _val){
                         _val = val;
                         $el[val ? 'show' : 'hide']();
@@ -123,6 +105,8 @@
                 }
             });
         });
+        $refresh();
+        return this;
     }
 
     var fnCache = {}, genFunc = function(expr){

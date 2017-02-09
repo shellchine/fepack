@@ -3,7 +3,7 @@ var path = require('path');
 var request = require('request');
 var Store = require('../lib/store');
 var $$ = require('../lib/bowlder');
-var confFile = path.resolve(__dirname, 'conf');
+var confFile = path.resolve(__dirname, 'conf.js');
 if(!fs.existsSync(confFile)){
     confFile = path.resolve(__dirname, 'conf.sample');
 }
@@ -58,9 +58,9 @@ module.exports = function(app){
 
     app.post('/go/create/:type', async function(req, res) { //创建项目
         var type = req.params.type;
-        var user = req.query.user;
-        var vcpath = req.query.vcpath;
-        var dest = req.query.dest;
+        var user = req.body.user;
+        var vcpath = req.body.vcpath;
+        var dest = req.body.dest;
         var authFile = path.resolve(__dirname, conf.authFile);
         if(!fs.existsSync(authFile)){
             res.jsonp({
@@ -69,7 +69,7 @@ module.exports = function(app){
             });
             return;
         }
-        var auth = fs.readFileSync(authFile).trim().split(/:/);
+        var auth = fs.readFileSync(authFile).toString().trim().split(/:/);
         var pipelineFile = `templates/pipeline.${type}.xml`;
         if(!fs.existsSync(pipelineFile)){
             res.jsonp({
@@ -79,39 +79,45 @@ module.exports = function(app){
             return;
         }
         var project = vcpath.replace(/\//g, '_');
-        var pipelineXml = $$.template.replace(fs.readFileSync(pipelineFile), {
+        var pipelineXml = $$.template.replace(fs.readFileSync(pipelineFile).toString(), {
             name: project,
             vcpath: vcpath,
             dest: dest,
             omad: ''
         }, null, '');
-
-        await post(`${host}/go/auth/security_check`, {
-            j_password: auth[1],
-            j_username: auth[0]
-        });
-        var [conf, xml] = getXmlConf(await get(`${host}/go/admin/config_xml/edit`));
-        if(xml.indexOf(`<pipeline name="${project}">`) != -1){
-            res.jsonp({
-                "msg":`已存在项目名 ${project}`,
-                "status":"failed"
+        try{
+            await post(`${host}/go/auth/security_check`, {
+                j_password: auth[1],
+                j_username: auth[0]
             });
-        }else{
-            conf["go_config[content]"] = xml.replace(/(?:\s*<\/pipelines>)/, "\n"+pipelineXml);
+            var [postConf, xml] = getXmlConf(await get(`${host}/go/admin/config_xml/edit`));
+            if(xml.indexOf(`<pipeline name="${project}">`) != -1){
+                res.jsonp({
+                    "msg":`已存在项目名 ${project}`,
+                    "status":"failed"
+                });
+            }else{
+                postConf["go_config[content]"] = xml.replace(/(?:\s*<\/pipelines>)/, "\n"+pipelineXml);
+            }
+            await post(`${host}/go/admin/config_xml`, postConf);
+            await stmts.delProject.run(project);
+            await stmts.addProject.run(project, vcpath, user, user, type);
+            res.jsonp({
+                status: "success",
+                msg: "添加项目成功"
+            });
+        }catch(e){
+            res.jsonp({
+                status: "fail",
+                msg: JSON.stringify(e)
+            });
         }
-        await post(`${host}/go/admin/config_xml`, conf);
-        await stmts.delProject.run(project);
-        await stmts.addProject.run(project, vcpath, user, user, type);
-        res.jsonp({
-            status: "success",
-            msg: "添加项目成功"
-        });
     });
 
     app.post('/go/user/chpwd', function(req, res) { //修改密码
-        var user = req.query.user;
-        var oldpw = req.query.oldpw;
-        var newpw = req.query.newpw;
+        var user = req.body.user;
+        var oldpw = req.body.oldpw;
+        var newpw = req.body.newpw;
         var file = `${infoDir}/.goaccess`;
         if(!fs.existsSync(file)){
             res.jsonp({
@@ -120,7 +126,7 @@ module.exports = function(app){
             });
             return;
         }
-        var tmp = fs.readFileSync(file);
+        var tmp = fs.readFileSync(file).toString();
         oldpw = `${user}:{SHA}${oldpw}=`;
 
         if(tmp.indexOf(oldpw) == -1){
@@ -140,7 +146,7 @@ module.exports = function(app){
     
     app.post('/go/addpartner/:project', function(req, res) { //添加项目开发者
         var project = req.params.project;
-        var user = req.query.newpartner;
+        var user = req.body.newpartner;
         (async function(){
             var tmp = await stmts.getPartners.get(project);
             var manager = tmp.manager + "," + user;
