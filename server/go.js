@@ -3,11 +3,15 @@ var path = require('path');
 var request = require('request');
 var Store = require('../lib/store');
 var $$ = require('../lib/bowlder');
+var confFile = path.resolve(__dirname, 'conf');
+if(!fs.existsSync(confFile)){
+    confFile = path.resolve(__dirname, 'conf.sample');
+}
+var conf = require(confFile);
 
 var host = "http://127.0.0.1:8153";
 
-module.exports = function(app, file){
-    var conf = require(path.resolve('./', file || 'conf'));
+module.exports = function(app){
     var infoDir = `${conf.cacheDir}/info`;
     var goDb = new Store(`${infoDir}/go.db`, "CREATE TABLE pipelines(name, vcpath, manager, creator, gid);CREATE TABLE users(name, fullname, role);");
     var stmts = {

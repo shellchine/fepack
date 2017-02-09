@@ -10,7 +10,6 @@ var depack = require('./depack');
 
 program
     .version(conf.version)
-    .option('-c, --conf [conf]', 'Specify the express config file')
     .option('-l, --list [list]', 'Specify the replace rule file')
     .option('-p, --port [port]', 'Specify the port nproxy will listen on(8989 by default)', parseInt)
     .option('-d, --debug', 'Enable debug mode')
@@ -19,7 +18,7 @@ program
 var port = program.port || 8989;
 
 nproxy(port, {
-    "responderListFilePath": program.list,
+    "responderListFilePath": program.list || "proxy.js",
     "debug": !!program.debug
 });
 
@@ -35,7 +34,7 @@ app.all('/go/*', function(req, res, next) {
     next();  
 });  
 
-require('./go')(app, program.conf);
+require('./go')(app);
 
 app.get('/nproxy/:url', function(req, res) {
     
