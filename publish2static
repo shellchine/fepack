@@ -169,16 +169,18 @@ util.printTime();
             console.log("收集页面: "+collectHtmls);
             require("util/collect_static");
         }else{
-            fs.rmdir(`${util.tmpDir}/inc_col`);
-            fs.rmdir(`${util.tmpDir}/collect_dev`);
-            fs.rmdir(`${util.tmpDir}/htmldir4col`);
+            if(fs.existsSync(`${util.tmpDir}/inc_col`)){
+                fs.rmdirSync(`${util.tmpDir}/inc_col`);
+                fs.rmdirSync(`${util.tmpDir}/collect_dev`);
+                fs.rmdirSync(`${util.tmpDir}/htmldir4col`);
+            }
         }
 
     }
 
-    // rsync同步到后端服务器(非云主机)
+    // 同步到后端服务器(非云主机)
     if (util.syncTo || projectJson[cloudEnv] || ENV[cloudEnv]) {
-        var rDir = util.syncTo.static;
+        var rDir = util.syncTo && util.syncTo.static;
         util.proc4backend(htmlDir, rDir);
     }
 
