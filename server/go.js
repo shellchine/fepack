@@ -49,7 +49,7 @@ module.exports = function(app){
         var partners = {};
         (async function(){
             var tmp = await stmts.getPartners.get(project);
-            $$.each(tmp.manager.split(/,/, item=>{
+            if(tmp) $$.each(tmp.manager.split(/,/, item=>{
                 partners[item.name] = 1;
             }));
             res.jsonp(partners);
