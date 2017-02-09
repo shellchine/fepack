@@ -1,5 +1,11 @@
 var request = require('request');
-var conf = require('./conf.js');
+var fs = require('fs');
+var path = require('path');
+var confFile = path.resolve(__dirname, 'conf');
+if(!fs.existsSync(confFile)){
+    confFile = path.resolve(__dirname, 'conf.sample');
+}
+var conf = require(confFile);
 var Store = require('../lib/store');
 var devHost = (conf.devHost || 'http://127.0.0.1').replace(/\/+$/, '/');
 var packDb = new Store(`${conf.cacheDir}/info/jspack.db`, "CREATE TABLE js(name, ver, list, ctime);CREATE INDEX js_name on js(name);CREATE INDEX js_ver on js(ver);CREATE TABLE css(name, ver, list, ctime);CREATE INDEX css_name on css(name);CREATE INDEX css_ver on css(ver);");
