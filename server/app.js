@@ -4,6 +4,7 @@ var program = require('commander');
 var nproxy = require('nproxy');
 var http = require('http');
 var express = require('express');
+var logger = require('morgan');
 var conf = require('../package.json');
 var depack = require('./depack');
 
@@ -24,6 +25,7 @@ nproxy(port, {
 
 var app = express();
 var expressPort = port + 1;
+app.use(logger('combined'));
 app.use(express.static(__dirname + '/public'));
 
 app.all('/go/*', function(req, res, next) {  
@@ -55,5 +57,5 @@ app.get('/nproxy/:url', function(req, res) {
 });
 
 http.createServer(app).listen(expressPort, function() {
-    console.log("Express started on port ", expressPort);
+    console.log("[INFO] Express started on", expressPort);
 });
