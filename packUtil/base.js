@@ -6,26 +6,21 @@ var fs = require('fs');
 var path = require('path');
 var iconv = require('iconv-lite');
 var ENV = process.env;
+var pwd = process.cwd();
 var util = require('../lib/util4go');
 var conf = util.conf;
+var log = util.log;
+var vc = util.vc;
+var projectJson = util.projectJson;
 var $$ = require('../lib/bowlder');
 var Store = require('../lib/store');
 var project = ENV.GO_PIPELINE_NAME;
 var stage = ENV.GO_STAGE_NAME;
-var log = util.log;
-var vc = util.vc;
 var execSync = util.execSync;
 var uniqueProject = {lib: 1}; //合并时不添加版本号
-var projectJson = util.projectJson;
 var RESFILES = util.RESFILES;
-var pwd = process.cwd();
 RESFILES.packFiles = util.readFromLog(util.logfiles.packFiles, util.logfmts.packFiles);
-var relativeRoot = {};
 var groupedPaths = {};
-$$.each(projectJson.relativeRoot, (dir, globstr) => {
-    var files = util.glob(pwd, globstr);
-    files.forEach(file => relativeRoot[file] = `${vc.path}/${dir}`);
-});
 global.packjscss = {};
 
 var packDb = new Store(`${conf.cacheDir}/info/jspack.db`, "CREATE TABLE js(name, ver, list, ctime);CREATE INDEX js_name on js(name);CREATE INDEX js_ver on js(ver);CREATE TABLE css(name, ver, list, ctime);CREATE INDEX css_name on css(name);CREATE INDEX css_ver on css(ver);");
@@ -36,9 +31,10 @@ var stmts = {
     addCss: packDb.prepare('insert into css values (?,?,?,?)')
 };
 
-exports.incparseDir = async function(dir){
-    log("Incparse " + dir, 2, 1);
-    await Promise.all(util.lsr(dir).map(async function(file) {
+exports.parseRes = async function(dir){
+    log(`ParseRes ${dir}`, 2, 1);
+    var promise = Promise.resolve();
+    util.lsr(dir).forEach(file => {promise = promise.then(async function(){
         file = file.trim();
         if(util.binaryReg.test(file)){
             return;
@@ -48,35 +44,30 @@ exports.incparseDir = async function(dir){
                 return;
             }
             var html = util.readWork(file);
-            log(`incparseHtml ${file}:\n`);
+            log(`parseResInHtml ${file}:\n`);
             util.stack("出错文件: "+file);
             //对于非ssi碎片，改变fulldir时所用的相对路径
-            var fileFromRoot = file.replace(new RegExp(util.tmpDir + '/.*?/'), '');
-            if(relativeRoot[fileFromRoot]){
-                global.VCPATH = relativeRoot[fileFromRoot];
-            }else if(/\//.test(fileFromRoot) && /<html|#header/i.test(html)){
-                global.VCPATH = path.resolve(vc.path, fileFromRoot);
+            var fileFromRoot = file.replace(new RegExp(util.distDir + '/.*?/'), '');
+            if(~fileFromRoot.indexOf('/') && /<html|#header/i.test(html)){
+                global.VCPATH = path.dirname(path.resolve(vc.path, fileFromRoot));
             }
             curfile = file;
             if(/\.(s?html|vm)$/.test(file)){
-                html = await incparseHtml(html, file);
+                html = await parseResInHtml(html, file);
             }else if(/\.json$/.test(file)){
-                html = await incparseJson(html, file);
+                html = await parseResInJson(html, file);
             }
-            log(`incparseHtml ${file} done.\n`);
+            log(`parseResInHtml ${file} done.\n`);
             util.writeTmp(file, html);
             global.VCPATH = vc.path;
             util.stack([]);
         }
-    }));
+    })});
+    await promise;
+    console.log(`ParseRes ${dir} done.`);
 }
 
-var incparseJson = exports.incparseJson = async function(str, name){
-    var oVCPATH = global.VCPATH;
-    var fileFromRoot = name.replace(vc.path + "/", "");
-    if(fileFromRoot && relativeRoot[fileFromRoot]){
-        global.VCPATH = relativeRoot[fileFromRoot];
-    }
+var parseResInJson = exports.parseResInJson = async function(str, name){
     name = name.replace(/(\S+\/|\.json$)/g, '');
     log(`处理JSON配置: ${name}\n`);
     if(!str) return;
@@ -99,7 +90,6 @@ var incparseJson = exports.incparseJson = async function(str, name){
             global.exitERR("JSON文件解析出错：$name");
         }
     }
-    global.VCPATH = oVCPATH;
     return util.quoteAddr2Cdn(str) + garbage;
 }
 
@@ -143,7 +133,7 @@ async function groupByJson(config, group){
     }
 }
 
-var incparseHtml = exports.incparseHtml = async function(html, file){
+var parseResInHtml = exports.parseResInHtml = async function(html, file){
     if(!html) {
         return html;
     }
@@ -219,8 +209,8 @@ var incparseHtml = exports.incparseHtml = async function(html, file){
         }
         return all;
     });
-    html = await util.replaceAsync(html, /<script([^>]*?)>\s*<\/script>(\s*)/ig, (all, m1, m2) => incparseJs(m1,m2,groups));
-    html = await util.replaceAsync(html, /<link([\s\S]*?)>(\s*)/ig, (all, m1, m2) => incparseCss(m1,m2,groups));
+    html = await util.replaceAsync(html, /<script([^>]*?)>\s*<\/script>(\s*)/ig, (all, m1, m2) => parseJsAddr(m1,m2,groups));
+    html = await util.replaceAsync(html, /<link([\s\S]*?)>(\s*)/ig, (all, m1, m2) => parseCssAddr(m1,m2,groups));
     html = html.replace(/<img\s+([\s\S]*?)>/ig, (all, m1) => procImg(m1));
     return util.quoteAddr2Cdn(html);
 }
@@ -244,7 +234,7 @@ function procImg(tmp){
     return `<img ${tmp}>`;
 }
 
-var incparseCss = async function(tmp, spaces, groups) { //多个link合并时，将第一个link替换为合并后的css，其余删除
+var parseCssAddr = async function(tmp, spaces, groups) { //多个link合并时，将第一个link替换为合并后的css，其余删除
     var print = '';
     var group = '';
     var csscount = 0;
@@ -256,7 +246,6 @@ var incparseCss = async function(tmp, spaces, groups) { //多个link合并时，
             src = util.fulldir(src);
         }
         var url = src;
-
         if (/rel=(['"])stylesheet/.test(tmp)){
             if (/_print\s*=\s*(['"])(\S+?)\1/i.test(tmp)) {
                 print = RegExp.$2;
@@ -308,7 +297,7 @@ var incparseCss = async function(tmp, spaces, groups) { //多个link合并时，
     return `<link${tmp}>${spaces}`;
 }
 
-var incparseJs = exports.incparseJs = async function(tmp, spaces, groups) { //多个script合并时，将第一个script替换为合并后的script，其余删除
+var parseJsAddr = async function(tmp, spaces, groups) { //多个script合并时，将第一个script替换为合并后的script，其余删除
     var group = '';
     var print = '';
     var packedJs;
@@ -399,7 +388,7 @@ async function jspack(arr, group, force){
     }
     var nsize, osize;  //共计合并的js数，新旧文件大小
     var files = arr.join(" ");
-    var path = vc.path + "js";
+    var packDir = `/js`;
 
     //js文件合并
     var content = '';
@@ -416,7 +405,7 @@ async function jspack(arr, group, force){
         var md5 = util.getMd5(longid, 1);
         shortid += "."+md5;
     }
-    var shortname = `${path}/${shortid}`;
+    var shortname = `${vc.path}${packDir}/${shortid}`;
 
     var jsVer = (await stmts.jsCount.get(shortname)).CN || 0;
     var packedJsUrl;
@@ -429,7 +418,7 @@ async function jspack(arr, group, force){
        || fullmd5 != RESFILES.packFiles[shortname].md5){
         jsVer ++;
 
-        var output, jsDir = util.getFolder(util.distStaticDirs[0]+"/js");
+        var output, jsDir = util.getFolder(util.distStaticDirs[0]+packDir);
         if (uniqueProject[project]) { //短名
             output = shortid+".js";
         } else {
@@ -447,20 +436,20 @@ async function jspack(arr, group, force){
 
         stmts.addJs.run(jsVer, files, +new Date);
         global.cdnCount ++;
-        packedJsUrl = conf.cdns[0].base + `/${vc.cdnfix}${path}/${output}`;
+        packedJsUrl = `${vc.cdnBase}${packDir}/${output}`;
         console.log("新增" + packedJsUrl);
 
         RESFILES.packFiles[shortname].cdnurl = packedJsUrl;
         RESFILES.packFiles[shortname].md5 = fullmd5;
 
         if(uniqueProject[project]){  //短名
-            global.diffiles[conf.cdns[0].base+`/${vc.cdnfix}${vc.path}/${output}`] = 1;
+            global.diffiles[packedJsUrl] = 1;
         }
     }else{
         //没有变化
         var output = `${shortid}.${jsVer}.js`;
         console.log(output + "没有变化");
-        packedJsUrl = conf.cdns[0].base+`/${vc.cdnfix}${path}/${output}`;
+        packedJsUrl = `${vc.cdnBase}/${output}`;
     }
     curGroupedPath.js[group] = packedJsUrl;
     postPacked(`${packedJsUrl}`, files, nsize, osize, count);
@@ -481,7 +470,7 @@ async function csspack(arr, group, force){
     var nsize, osize;        //共计引用的css数，新旧文件大小
     var files = arr.join(" ");
 
-    var path = `${vc.path}/css`;
+    var packDir = `/css`;
 
     //css文件合并
     var content = '';
@@ -492,10 +481,10 @@ async function csspack(arr, group, force){
         tmp = tmp.replace(util.UTF8BOM, '');
         //替换相对路径
         var [csscontent, csscount] = await preCssPack(tmp, url);
-        content += "$csscontent\n";
+        content += csscontent + "\n";
         count += csscount - 1;
     };
-    if(global.VCPATH){
+    if(global.VCPATH && conf.firm == 'netease'){
         var cdn_base = "http://img[1-6].cache.netease.com/f2e/"+vc.cdnfix+global.VCPATH;
         content = content.replace(new RegExp(cdn_base+"/css/", "g"), "") //相对于css/pack.xxxxx.d.css
             .replace(new RegExp(cdn_base+"/", "g"), "../"); //相对于css/pack.xxxxx.d.css
@@ -504,7 +493,7 @@ async function csspack(arr, group, force){
     var longid = arr.join("");
     var md5 = util.getMd5(longid, 1);
     var shortid = group+"."+md5;
-    var shortname = path+"/"+shortid;
+    var shortname = `${vc.path}${packDir}/${shortid}`;
 
     var cssVer = (await stmts.cssCount.get(shortname)).CN || 0;
     content = util.toAscii(content);
@@ -515,7 +504,7 @@ async function csspack(arr, group, force){
     }
     if((ENV.HTTPS_CDN && !/https:/.test(RESFILES.packFiles[shortname].cdnurl))|| fullmd5 != RESFILES.packFiles[shortname].md5){
         cssVer ++;
-        var cssDir = util.getFolder(`${util.distStaticDirs[0]}/css`);
+        var cssDir = util.getFolder(util.distStaticDirs[0]+packDir);
         var output = `${shortid}.${cssVer}.css`;
         util.compressCss(content, `${cssDir}/${output}`);
         osize = content.length;
@@ -524,7 +513,7 @@ async function csspack(arr, group, force){
         //$files: static.f2e下文件列表
 
         global.cdnCount ++;
-        cssPackedUrl = conf.cdns[0].base + `/${vc.cdnfix}${path}/${output}`;
+        cssPackedUrl = `${vc.cdnBase}${packDir}/${output}`;
         console.log("新增"+cssPackedUrl);
 
         RESFILES.packFiles[shortname].cdnurl = cssPackedUrl;
@@ -532,7 +521,7 @@ async function csspack(arr, group, force){
     }else{
         var output = `${shortid}.${cssVer}.css`;
         console.log(output+"没有变化");
-        cssPackedUrl = util.distStaticDirs[0] + `/${vc.cdnfix}${path}/${output}`;
+        cssPackedUrl = util.distStaticDirs[0] + `/${vc.cdnfix}${packDir}/${output}`;
     }
 
     curGroupedPath.css[group] = cssPackedUrl;
@@ -557,14 +546,11 @@ async function preCssPack(tmp, url, compress){
     var count = 1;
     util.stack("出错文件: "+url);
 
-    var cssPath = path.dirname(url);
-    global.IMGURL_ROOT = cssPath; //getcss, cdnImgPath用，非cdn资源
-    [,,count, tmp] = await util.procSingleCss(undefined, compress, tmp);
-
-    //处理本css内的相对url
-    tmp = tmp.replace(/\burl\s*\(\s*['"]?(\S+?)['"]?\s*\)/g, (all, m1) => util.cdnImgPath(m1));
-
-    global.IMGURL_ROOT = "";
+    var cssDir = path.dirname(url);
+    [,,count, tmp] = await util.procSingleCss(undefined, compress, tmp, cssDir);
+    //将css内的相对url转成绝对地址
+    tmp = tmp.replace(/\burl\s*\(\s*['"]?(\S+?)['"]?\s*\)/g, (all, m1) => util.cdnImgPath(m1, null, cssDir));
+    
     util.stack([]);
     return [tmp, count];
 }

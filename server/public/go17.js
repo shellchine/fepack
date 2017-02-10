@@ -86,7 +86,7 @@
                 })[jobName];
                 if(jobReport){
                     var url = `/go/files/${stagePath}/${jobName}/gohtml/${jobReport}`;
-                    var $iframe = $('<iframe frameborder=0 class="html_report" src="'+url+'"></iframe>').appendTo($build_cause);
+                    var $iframe = $(`<iframe frameborder=0 class="html_report" src="${url}"></iframe>`).appendTo($build_cause);
                     $iframe.load(function(){
                         $iframe.css({
                             overflow: "hidden",

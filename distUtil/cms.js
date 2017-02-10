@@ -438,10 +438,10 @@ async function inlineSSI4CMS(file){ //输出内联ssi
     var absdir = path.dirname(file);
     var html = util.readWork(file);
     if(/\.json$/.test(file)){
-        html = await basePack.incparseJson(html, file); //group, $file只用于取group名
+        html = await basePack.parseResInJson(html, file); //group, $file只用于取group名
     }else{
         html = html.replace(/<meta\s+name\s*=\s*"cms_id".*?>\s*/ig, '')
-        html = await basePack.incparseHtml(html);
+        html = await basePack.parseResInHtml(html);
     }
     html = await util.replaceAsync(html, /<!--#include\s+(file|virtual)=(['"])(.*?)\2\s*-->/ig, (all, m1, m2, m3) => parseSSI4CMS(m3, absdir));
     return html;

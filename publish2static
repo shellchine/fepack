@@ -150,7 +150,7 @@ util.printTime();
         } else if(flag == 10) { //不发布到static服务器及cdn的其它文件
             cpRes(file, base);
         }
-    }, /^(__|\.|goscript|_backup)/);
+    });
     util.printTime();
 
     //publish to static.f2e.netease.com
@@ -160,8 +160,7 @@ util.printTime();
         if (util.syncTo || projectJson[cloudEnv] || ENV[cloudEnv]) {
             log(`处理${htmlDir}目录(parseSSI)`, 2, 1);
             parseSSI(htmlDir);     //内联所有外部ssi
-            //扩充相对路径，默认基于项目根目录
-            incparse(htmlDir);
+            parseRes(htmlDir);     //处理资源路径
         }
 
         if (global.collectHtmls && global.collectHtmls.length >= 0) {
@@ -277,8 +276,8 @@ function validCss(file){
     return errors.map(msg => " - " + msg).join("\n");
 }
 
-function incparse(dir, clear){
-    log(`[incparse] ${dir}`, 2, 1);
+function parseRes(dir, clear){ // 处理代码中的资源地址(改为绝对路径)
+    log(`[parseRes] ${dir}`, 2, 1);
     util.lsr(dir).forEach(file => {
         if(util.isPreserved(file)){
             return;
@@ -286,7 +285,7 @@ function incparse(dir, clear){
         
         log(`Parsing ${file}:\n`);
         var ext = path.extname(file);
-        if (fs.existsSync(file) && ext != ".swf") {
+        if (fs.existsSync(file) && !util.binaryReg.test(ext)) {
             var html = readWork(file);
             //对于非ssi碎片，改变fulldir()所用的相对路径
             var tmppath = path.dirname(file);

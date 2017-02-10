@@ -39,8 +39,6 @@ var RESFILES = util.RESFILES;
 var logfiles = util.logfiles;
 var logfmts = util.logfmts;
 var distStaticDirs = util.distStaticDirs;
-//当前项目静态资源在cdn ftp上的保存目录
-var ftpRootDir = path.join(conf.cdnRootDir, `/${vc.cdnfix}${vc.path}`);
 //相对工作目录读写
 var pwd = process.cwd();
 var read = util.read;
@@ -80,12 +78,10 @@ var projectJson = util.projectJson;
 (async function(){
     await util.promise;
     if (!/Live/.test(stage)) {         //publishStage, publishQAStage
-        // 1. ~ 4.
         await cp4live();
-
         await parseSSI(htmlDir);     //将html中的外部ssi全部内联
     }
-    // 6c. 处理要发布到cms的文件
+    // 处理要发布到cms的文件
     if(cmsUtil && util.isDir(util.distCmsDir)){
         log("发布CMS页面", 2, 1);
         var channel = ENV.CMS_CHANNEL;
@@ -101,7 +97,7 @@ var projectJson = util.projectJson;
         }
         log("合并页面中的静态资源\n", 4);
         if(packUtils.base){
-            await packUtils.base.incparseDir(util.distCmsDir);
+            await packUtils.base.parseRes(util.distCmsDir);
         }
         upload2ImgCdn(1);
         if(channel){
@@ -113,12 +109,13 @@ var projectJson = util.projectJson;
         util.printTime();
     }
 
+    // 处理静态资源路径
     if(!/Live/.test(stage)){
         if(packUtils.base){
-            await packUtils.base.incparseDir(htmlDir);
+            await packUtils.base.parseRes(htmlDir);
         }
     }
-    // 8. RSYNC同步到后端服务器
+    // RSYNC同步到后端服务器
     upload2ImgCdn(1); //上传静态资源到cdn
     
     if (util.syncTo){
@@ -169,7 +166,10 @@ function pathFromVc(dir){ //相对vc根目录的路径，以"/"开头
     return dir.replace(new RegExp(`${util.distDir}/[^/]*`), `/${vc.cdnfix}${vc.path}`).replace(vc.localhost+'/', '/');
 }
 
+var inlineSSICache = {};
 async function inlineSSI(file, relroot){
+    var html = inlineSSICache[file] || "";
+    if(html) return html;
     relroot = pathFromVc(relroot);
     var ssifile = path.resolve(relroot, file);
     // TODO: inc相对路径当主文件不在根目录时可能有问题
@@ -178,7 +178,6 @@ async function inlineSSI(file, relroot){
         return `<!--#include virtual="${ssifile}"-->`;
     }
     var reldir = path.dirname(ssifile);
-    var html = "";
     try{
         if(~ssifile.indexOf(vc.cdnfix+vc.path)){ //本项目文件
             html = util.readWork(ssifile);
@@ -196,14 +195,14 @@ async function inlineSSI(file, relroot){
     }
     if(packUtils.base){
         if(/\.json$/.test(ssifile)){
-            html = await packUtils.base.incparseJson(html, ssifile); //group
+            html = await packUtils.base.parseResInJson(html, ssifile); //group
         }else{
-            html = await packUtils.base.incparseHtml(html); //group
+            html = await packUtils.base.parseResInHtml(html); //group
         }
     }
     html = await util.replaceAsync(html, /<!--#include\s+(file|virtual)=(['"])(\S*?)\2\s*-->/ig, (all, m1, m2, m3) => inlineSSI(m3, reldir));
     html = html.replace(/<meta\s+name="cms_id".*?>\s*/ig, '');
-    return html;
+    return (inlineSSICache[file] = html);
 }
 
 async function parseSSI(dir){
@@ -221,7 +220,11 @@ async function parseSSI(dir){
             global.VCPATH = relroot.substr(1);
         }
         //内联所有跨项目的ssi
-        content = await util.replaceAsync(content, /<!--#include\s+(file|virtual)=(["'])((\/|\.\.\/|widget|modules)\S*?)\2\s*-->/ig, (all, m1, m2, m3) => inlineSSI(m3, relroot));
+        content = await util.replaceAsync(content, /<!--#include\s+(file|virtual)=(["'])((\/|\.\.\/)\S*?)\2\s*-->/ig, (all, m1, m2, m3) => inlineSSI(m3, relroot));
+        //内联本项目内不单独发布的ssi
+        if(projectJson.skipRes){
+            content = await util.replaceAsync(content, /<!--#include\s+(file|virtual)=(["'])((widget|modules)\S*?)\2\s*-->/ig, (all, m1, m2, m3) => inlineSSI(m3, relroot));
+        }
         //内联*.js, *.json
         content = content.replace(/<!--#include\s+(file|virtual)=(["'])(\S+?\.(js|json))\2\s*-->/ig, (all, m1, m2, m3) => inlineSSI(m3, relroot));
         global.VCPATH = vc.path;
@@ -250,8 +253,9 @@ async function cp4live(){
         }
     });
     // 1b. 更新swf, pdf, css
-    if (distUtils.cdn && RESFILES.uploadCount[2]) {
+    if (distUtils.cdn && conf.cdns[1] && RESFILES.uploadCount[2]) {
         log(`上传可能被js引用的静态资源到CDN(uploadCount: ${JSON.stringify(RESFILES.uploadCount)})`, 2, 1);
+        var ftpRootDir = (conf.cdns[1].ftpBase || "/f2e") + vc.cdnfix + vc.path;
         ftp.publish(conf.cdns[1].ftp, distUtils.cdn.mirrorCommand(distStaticDirs[1], ftpRootDir)); //file
     }
     var csscount = RESFILES.uploadCount[1] || 0;
@@ -277,11 +281,12 @@ async function cp4live(){
 
 
 function upload2ImgCdn(clear){
-    if (!distUtils.cdn) return;
+    if (!distUtils.cdn || !conf.cdns[0]) return;
     log(`上传到图片CDN(${global.cdnCount} 个文件)`, 2, 1);
     if (global.cdnCount) {
         log(execSync(`cd ${distStaticDirs[0]};tree 2>/dev/null`));
         util.checkNoStatic(distStaticDirs[0]);
+        var ftpRootDir = (conf.cdns[0].ftpBase || "/f2e") + vc.cdnfix + vc.path;
         ftp.publish(conf.cdns[0].ftp, distUtils.cdn.mirrorCommand(distStaticDirs[0], ftpRootDir));
         util.printTime();
         global.cdnCount = 0;

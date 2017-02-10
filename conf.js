@@ -29,25 +29,27 @@ module.exports = {
             base: "http://img2.cache.netease.com/f2e",
             suffix: "jpg jpeg png bmp gif svg ico js css cur eot ttf woff woff2 mp3",
             ftp: "61.135.251.132:16321",
+            ftpBase: "/f2e",
             authFile: ".ftpauth"
         },
         {
             base: "http://file.ws.126.net/f2e",
             suffix: "swf pdf fnt htc apk ipa plist gltf",
             ftp: "61.135.251.56:16321",
+            ftpBase: "/f2e",
             authFile: ".ftpauth"
         }
     ],
+    serverBase: "/f2e/{{path}}",
     syncs: [
-        {type: "cp", base: "/var/f2e_inc"},
-        {type: "cp", base: "/var/f2e_inc", devOnly: true},
-        {type: "cp", base: "/var/auto_inc"},
-        {type: "cp", base: "/var/auto_inc", devOnly: true},
-        {type: "cp", base: "/var/house_inc"},
-        {type: "cp", base: "/var/house_inc", devOnly: true},
-        {type: "cp", base: "/var/recm_inc"},
-        {type: "cp", base: "/var/recm_inc", devOnly: true},
-        {type: "cp", base: "/var/video_inc"}
-    ],
-    cdnRootDir: "/f2e"
+        { base: "/var/f2e_inc" },
+        { base: "/var/f2e_inc", devOnly: true },
+        { base: "/var/auto_inc" },
+        { base: "/var/auto_inc", devOnly: true },
+        { base: "/var/house_inc" },
+        { base: "/var/house_inc", devOnly: true },
+        { base: "/var/recm_inc" },
+        { base: "/var/recm_inc", devOnly: true },
+        { base: "/var/video_inc" }
+    ]
 }
