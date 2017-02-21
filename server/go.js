@@ -63,7 +63,7 @@ module.exports = function(app){
         })();
     });
 
-    app.post('/go/create/:type', async function(req, res) { //创建项目
+    app.post('/go/create/:type', function(req, res) { //创建项目
         var type = req.params.type;
         var user = req.body.user;
         var vcpath = req.body.vcpath;
@@ -92,65 +92,70 @@ module.exports = function(app){
             dest: dest,
             omad: ''
         }, null, '');
-        try{
-            await post(`${host}/go/auth/security_check`, {
-                j_password: auth[1],
-                j_username: auth[0]
-            });
-            var [postConf, xml] = getXmlConf(await get(`${host}/go/admin/config_xml/edit`));
-            if(xml.indexOf(`<pipeline name="${project}">`) != -1){
-                res.jsonp({
-                    "msg":`已存在项目名 ${project}`,
-                    "status":"failed"
+        
+        (async function(){
+            try{
+                await post(`${host}/go/auth/security_check`, {
+                    j_password: auth[1],
+                    j_username: auth[0]
                 });
-            }else{
-                postConf["go_config[content]"] = xml.replace(/(?:\s*<\/pipelines>)/, "\n"+pipelineXml);
+                var [postConf, xml] = getXmlConf(await get(`${host}/go/admin/config_xml/edit`));
+                if(xml.indexOf(`<pipeline name="${project}">`) != -1){
+                    res.jsonp({
+                        "msg":`已存在项目名 ${project}`,
+                        "status":"failed"
+                    });
+                }else{
+                    postConf["go_config[content]"] = xml.replace(/(?:\s*<\/pipelines>)/, "\n"+pipelineXml);
+                }
+                await post(`${host}/go/admin/config_xml`, postConf);
+                await stmts.delProject.run(project);
+                await stmts.addProject.run(project, vcpath, user, user, type);
+                res.jsonp({
+                    status: "success",
+                    msg: "添加项目成功"
+                });
+            }catch(e){
+                res.jsonp({
+                    status: "fail",
+                    msg: JSON.stringify(e)
+                });
             }
-            await post(`${host}/go/admin/config_xml`, postConf);
-            await stmts.delProject.run(project);
-            await stmts.addProject.run(project, vcpath, user, user, type);
-            res.jsonp({
-                status: "success",
-                msg: "添加项目成功"
-            });
-        }catch(e){
-            res.jsonp({
-                status: "fail",
-                msg: JSON.stringify(e)
-            });
-        }
+        })();
     });
 
-    app.post('/go/user/add', async function(req, res) { //添加用户
+    app.post('/go/user/add', function(req, res) { //添加用户
         var id = req.body.id;
         var name = req.body.name;
         
-        try{
-            var item = await stmts.findUser.get(id);
-            if(item){
+        (async function(){
+            try{
+                var item = await stmts.findUser.get(id);
+                if(item){
+                    res.jsonp({
+                        status: "fail",
+                        msg: `用户${id}已存在`
+                    });
+                    return;
+                }
+                var newpw = `${id}:{SHA}iYwBq/SLfDm81KBe4iiqEBZqXyA=`;
+                var tmp = fs.readFileSync(pwFile).toString();
+                if(!(new RegExp(`(^|\n)${id}:`)).test(tmp)){
+                    tmp = `${newpw}\n${tmp}`;
+                    fs.writeFileSync(pwFile, tmp);
+                }
+                await stmts.delProject.run(id, name);
+                res.jsonp({
+                    status: "success",
+                    msg: `添加用户${id}成功`
+                });
+            }catch(e){
                 res.jsonp({
                     status: "fail",
-                    msg: `用户${id}已存在`
+                    msg: JSON.stringify(e)
                 });
-                return;
             }
-            var newpw = `${id}:{SHA}iYwBq/SLfDm81KBe4iiqEBZqXyA=`;
-            var tmp = fs.readFileSync(pwFile).toString();
-            if(!(new RegExp(`(^|\n)${id}:`)).test(tmp)){
-                tmp = `${newpw}\n${tmp}`;
-                fs.writeFileSync(pwFile, tmp);
-            }
-            await stmts.delProject.run(id, name);
-            res.jsonp({
-                status: "success",
-                msg: `添加用户${id}成功`
-            });
-        }catch(e){
-            res.jsonp({
-                status: "fail",
-                msg: JSON.stringify(e)
-            });
-        }
+        })();
 
     });
     
