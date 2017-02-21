@@ -144,7 +144,7 @@ module.exports = function(app){
                     tmp = `${newpw}\n${tmp}`;
                     fs.writeFileSync(pwFile, tmp);
                 }
-                await stmts.delProject.run(id, name);
+                await stmts.addUser.run(id, name);
                 res.jsonp({
                     status: "success",
                     msg: `添加用户${id}成功`
