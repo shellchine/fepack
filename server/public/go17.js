@@ -301,10 +301,10 @@
             });
             scope.pathBlur = function(i){
                 var e = scope.$event, input = e.target;
-                var vcpath = input.value.trim().replace(/\\/g, '/').replace(/^\/?(frontend)?\/?/, '').replace(/\/.*/, '');
-                var dest = scope.groups[i].dir2dest[vcpath];
-                if(dest){
-                    $(input).next("select").val(dest);
+                var dir = input.value.trim().replace(/\\/g, '/').replace(/^\/?(frontend)?\/?/, '');
+                var _dest = scope.groups[i].dir2dest[dir]; //根据仓库目录自动设定发布目标
+                if(_dest){
+                    $(input).next("select").val(_dest);
                 }
             };
             
@@ -312,7 +312,7 @@
                 var group = scope.groups[i];
                 var url = `${host}/go/create/${group.type}`;
                 
-                var vcpath = (group.vcpath || '').trim().replace(/\\/g, '/').replace(/^\/?(frontend)?\/?/, '').replace(/\/.*/, '');
+                var vcpath = (group.vcpath || '').trim().replace(/\\/g, '/').replace(/^\/?(frontend)?\/?/, '');
                 if(!vcpath){
                     return alert("代码路径不能为空");
                 }

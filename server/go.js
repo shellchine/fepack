@@ -197,10 +197,10 @@ module.exports = function(app){
 
 }
 
-function post(url, conf){
+function post(url, data, conf){
     conf = $$.extend({jar: true}, conf);
     return new Promise((resolve, reject) => {
-        request.post(url, conf, function(err, res, body){
+        request.post(url, data, conf, function(err, res, body){
             if(err){
                 reject(err);
             }else{
