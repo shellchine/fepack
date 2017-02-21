@@ -97,6 +97,53 @@
             }
         }
 
+        function initAddUser(){ //首页页: 添加用户
+            var $addUser = $(`<li class="change-pwd">
+                <a go-click="showAddUser()">添加用户</a>
+                <form class="go-change-pwd-form">
+                <div><label>ID：</label><input /></div>
+                <div><label>姓名：</label><input /></div>
+                <a class="submit" go-click="addUser()">提交</a>
+                <div class="status" go-html="msg.addUser" go-class="addSuccess?'success':''"></div></form></li>`).compile(scope);
+            $addUser.click(function(){return false}).prependTo($("#header .user"));
+            var $inputs = $addUser.find("input");
+            $("body").click(function(e){
+                $addUser.removeClass("on");
+            });
+            scope.showAddUser = function(){
+                $addUser.addClass("on");
+                $inputs.val('');
+                scope.msg.addUser = '';
+                scope.addSuccess = false;
+            };
+            scope.addUser = function(){
+                scope.msg.addUser = '';
+                var id = $inputs[0].value.trim();
+                var name = $inputs[1].value.trim();
+                if(id === ''){
+                    scope.msg.addUser = "ID不能为空";
+                }else if(!name){
+                    scope.msg.addUser = "姓名不能为空";
+                }else{
+                    $.post(`${host}/go/user/add`, {
+                        id : id,
+                        name : name
+                    }, function(json){
+                        if(json.status == 'success'){
+                            scope.msg.addUser = `用户${id}(${name})添加成功`;
+                            scope.addSuccess = true;
+                            setTimeout(function(){
+                                $addUser.removeClass("on");
+                            }, 1200);
+                        }else if(json.msg){
+                            scope.msg.addUser = json.msg;
+                        }
+                        $addUser.$refresh();
+                    });
+                }
+            };
+        }
+        
         function initChgPwd(){ //详情页: 修改密码
             var $chgPwd = $(`<li class="change-pwd">
                 <a go-click="showChgPwd()">修改密码</a>
@@ -107,29 +154,29 @@
                 <a class="submit" go-click="chgPwd()">提交</a>
                 <div class="status" go-html="msg.chgPwd" go-class="chgSuccess?'success':''"></div></form></li>`).compile(scope);
             $chgPwd.click(function(){return false}).prependTo($("#header .user"));
-            var $chgPwdInputs = $chgPwd.find("input");
+            var $inputs = $chgPwd.find("input");
             $("body").click(function(e){
                 $chgPwd.removeClass("on");
             });
             scope.showChgPwd = function(){
                 $chgPwd.addClass("on");
-                $chgPwdInputs.val('');
+                $inputs.val('');
                 scope.msg.chgPwd = '';
                 scope.chgSuccess = false;
             };
             scope.chgPwd = function(){
                 scope.msg.chgPwd = '';
-                if($chgPwdInputs[0].value === ''){
+                if($inputs[0].value === ''){
                     scope.msg.chgPwd = "旧密码不能为空";
-                }else if($chgPwdInputs[1].value.length < 6){
+                }else if($inputs[1].value.length < 6){
                     scope.msg.chgPwd = "新密码不能少于6位";
-                }else if($chgPwdInputs[1].value != $chgPwdInputs[2].value){
+                }else if($inputs[1].value != $inputs[2].value){
                     scope.msg.chgPwd = "新密码前后不一致";
                 }else{
                     $.post(`${host}/go/user/chpwd`, {
                         user : user,
-                        oldpw : $.b64_sha1($chgPwdInputs[0].value),
-                        newpw : $.b64_sha1($chgPwdInputs[1].value)
+                        oldpw : $.b64_sha1($inputs[0].value),
+                        newpw : $.b64_sha1($inputs[1].value)
                     }, function(json){
                         if(json.status == 'success'){
                             scope.msg.chgPwd = "密码更新成功";
@@ -215,6 +262,7 @@
             var $groups, $content = $("#pipeline_groups_container").hide();
             if($content.length == 0) return;
             getInfo(function(){
+                scope.admins[user] && initAddUser();
                 var pipelines = scope.pipelines;
                 var divHtmls = scope.divHtmls = {};
                 $content.find(".pipeline").each(function(){

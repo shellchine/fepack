@@ -13,6 +13,11 @@ var host = "http://127.0.0.1:8153";
 
 module.exports = function(app){
     var infoDir = `${conf.cacheDir}/info`;
+    var pwFile = `${infoDir}/.goaccess`;
+    if(!fs.existsSync(pwFile)){
+        console.log(`找不到帐号配置文件。`);
+        return;
+    }
     var goDb = new Store(`${infoDir}/go.db`, "CREATE TABLE pipelines(name, vcpath, manager, creator, gid);CREATE TABLE users(name, fullname, role);");
     var stmts = {
         pipelines: goDb.prepare("select * from pipelines"),
@@ -20,7 +25,9 @@ module.exports = function(app){
         getPartners: goDb.prepare("select manager from pipelines where name=?"),
         setPartners: goDb.prepare("update pipelines set manager=? where name=?"),
         delProject: goDb.prepare("delete from pipelines where name=?"),
-        addProject: goDb.prepare("insert into pipelines values(?, ?, ?, ?, ?)")
+        addProject: goDb.prepare("insert into pipelines values(?, ?, ?, ?, ?)"),
+        addUser: goDb.prepare("insert into users values(?, ?, '2')"),
+        findUser: goDb.prepare("select id from users where id=?")
     }
 
     app.get('/go/list', function(req, res) { //获取概览信息
@@ -114,19 +121,44 @@ module.exports = function(app){
         }
     });
 
+    app.post('/go/user/add', async function(req, res) { //添加用户
+        var id = req.body.id;
+        var name = req.body.name;
+        
+        try{
+            var item = await stmts.findUser.get(id);
+            if(item){
+                res.jsonp({
+                    status: "fail",
+                    msg: `用户${id}已存在`
+                });
+                return;
+            }
+            var newpw = `${id}:{SHA}iYwBq/SLfDm81KBe4iiqEBZqXyA=`;
+            var tmp = fs.readFileSync(pwFile).toString();
+            if(!(new RegExp(`(^|\n)${id}:`)).test(tmp)){
+                tmp = `${newpw}\n${tmp}`;
+                fs.writeFileSync(pwFile, tmp);
+            }
+            await stmts.delProject.run(id, name);
+            res.jsonp({
+                status: "success",
+                msg: `添加用户${id}成功`
+            });
+        }catch(e){
+            res.jsonp({
+                status: "fail",
+                msg: JSON.stringify(e)
+            });
+        }
+
+    });
+    
     app.post('/go/user/chpwd', function(req, res) { //修改密码
         var user = req.body.user;
         var oldpw = req.body.oldpw;
         var newpw = req.body.newpw;
-        var file = `${infoDir}/.goaccess`;
-        if(!fs.existsSync(file)){
-            res.jsonp({
-                status: "fail",
-                msg: "密码设置出错(服务器错误)"
-            });
-            return;
-        }
-        var tmp = fs.readFileSync(file).toString();
+        var tmp = fs.readFileSync(pwFile).toString();
         oldpw = `${user}:{SHA}${oldpw}=`;
 
         if(tmp.indexOf(oldpw) == -1){
@@ -136,7 +168,7 @@ module.exports = function(app){
             });
         }else{
             tmp = tmp.replace(oldpw, `${user}:{SHA}${newpw}=`);
-            fs.writeFileSync(file, tmp);
+            fs.writeFileSync(pwFile, tmp);
             res.jsonp({
                 status: "success",
                 msg: "更新成功"
