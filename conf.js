@@ -13,13 +13,13 @@ module.exports = {
         js: ["js.base"],
         html: ["html.base"]
     },
-    pack: ["base"],
     devDist: ["omad"],
-    dist: ["cms", "omad", "scp"],
+    pack: ["base"],
     compress: {
         js: 2,
         css: 1
     },
+    dist: ["cms", "omad", "scp"],
     files: {
         exclude: /\.(avi|mpeg|psd)$/,
         preserve: /\.(php|jsp|asp|xml|min\.js|min\.css)$/

@@ -492,7 +492,7 @@ async function csspack(arr, group, force){
 
     var longid = arr.join("");
     var md5 = util.getMd5(longid, 1);
-    var shortid = group+"."+md5;
+    var shortid = `${group}.${md5}`;
     var shortname = `${vc.path}${packDir}/${shortid}`;
 
     var cssVer = (await stmts.cssCount.get(shortname)).CN || 0;

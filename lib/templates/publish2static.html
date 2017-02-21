@@ -3,9 +3,13 @@
 <head>
     <META http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <style>
+      body{padding:10px}
       .yui-ge.build_summary_page{margin-top:0}.relative_box{position:relative}.passed{background-color:#F6FFE4;background-color:transparent;color:#000}.scheduled,.assigned,.preparing,.building,.completing{background-color:#FFFEE2;background-color:transparent}.failed,.failing,.cancelled{background-color:#FFE1E0;background-color:transparent;color:#000}.inactive,.discontinued,.unknown,.building_unknown{background-color:#ECE9D8;background-color:transparent;color:#666}.building_passed{background-color:#B6FFB1;color:#030}.building_failed{background-color:#FFC2C9}.projects_summary .info{font-weight:bold;border:0px}.projects_summary .rate{font-size:1em}.tabContent{clear:both;background-color:#FFF}.entry img{margin-right:5px}.subtitle{font-weight:bold}.modifications{border:none;width:100%;*width:95%;font-size:0.85em}.modifications .summary{padding-top:1em;padding-bottom:0.5em}.modifications th,.modifications th .highlight-false,.modifications td{border:none;padding:0.25em 0;line-height:1em}.modifications .highlight-true{font-style:italic}.modifications .odd{background-color:#FFF}.modifications .even{background-color:#FFF}.modifications .comment{line-height:1.22em}.modifications .normal{font-weight:normal;line-height:1.22em}
+      table#build-peroperties-table th, table#build-peroperties-table td,table.modifications th,table.modifications td{font-size: 11px;padding: 8px 10px;border-bottom: 1px dotted #ccc;background-color: #fff;}
+      table#build-peroperties-table th,.modifications th{border-bottom: 1px solid #ddd;background: #b9f6ca;white-space: nowrap;}
       *{font-size:12px}
       table{border-collapse: collapse; border-spacing: 0;}
+      table#build-peroperties-table,table.modifications{margin-top: 15px;border: 1px solid #CCCCCC; width: 100%;}
       h2{padding:2pt;font-size:18px;border-bottom: rgb(44, 86, 86) 2px dashed;border-left: rgb(44, 86, 86) 3px solid;}
       .modifications .highlight-true{text-align:left;padding-top:1.5em;font-weight:normal;font-style:normal}
       .modifications tbody{border-bottom:1px dotted #BEBEBE}
@@ -19,14 +23,12 @@
     <pre class="toperr"><%=toperr%></pre>
     <%}%>
     
-    <table class="modifications">
-        <thead>
-          <tr>
-            <th align=left colspan=2>相关文件下载：
-              <a href="<%=tarLink%>">HTML文件包</a>
-            </th>
-          </tr>
-        </thead>
+    <table>
+      <thead>
+        <tr>
+          <td align=left colspan=2>相关文件下载：<a href="<%=tarLink%>">HTML文件包</a></td>
+        </tr>
+      </thead>
     </table>
     
     <%if(typeof omad != 'undefined'){%>
@@ -45,6 +47,7 @@
     
     <%if(typeof errors != 'undefined'){%>
     <table class="modifications">
+      <tr class="table-top"><th colspan=2>出错信息</th></tr>
       <%$$.each(errors, function(info){%>
       <tr>
         <td class='highlight-true'><%=info.url%></td>
@@ -60,6 +63,7 @@
     
     <%if(typeof warnings != 'undefined'){%>
     <table class="modifications">
+      <tr class="table-top"><th colspan=2>文件信息</th></tr>
       <%$$.each(warnings, function(info){%>
       <tr>
         <td class='highlight-true'><%=info.url%></td>

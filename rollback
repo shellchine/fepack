@@ -21,9 +21,12 @@ global.exitERR = function(err, warn){
     }
 }
 
+var Reporter = require("./lib/reporter");
+var reporter = new Reporter("rollback", `rollback.html`);
 var fs = require('fs');
 var $$ = require('./lib/bowlder');
 var util = require("./lib/util4go");
+util.reporter = reporter;
 var ENV = process.env;
 var stage = ENV.GO_STAGE_NAME;
 var label = ENV.GO_PIPELINE_LABEL || 0;
@@ -37,8 +40,6 @@ $$.each(conf.dist, name=>{
     distUtils[name] = require("./distUtil/" + name);
 });
 
-var Reporter = require("./lib/reporter");
-var reporter = util.reporter = new Reporter("rollback", `rollback.html`);
 
 //1. 回滚cdn文件映射表($infoDir/.curfiles)
 var backupFile = `${util.backupDir}/info.${label}.tar.gz`;

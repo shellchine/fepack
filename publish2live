@@ -20,12 +20,15 @@ global.exitERR = function(err, warn){
         warnArr.push(msg);
     }
 }
+var Reporter = require("./lib/reporter");
+var reporter = new Reporter("publish2live", `live.html`);
 var fs = require('fs');
 var request = require('request');
 var iconv = require('iconv-lite');
 var path = require('path');
 var $$ = require('./lib/bowlder');
 var util = require("./lib/util4go");
+util.reporter = reporter;
 var log = util.log;
 var vc = util.vc;
 var conf = util.conf;
@@ -47,8 +50,6 @@ var readWork = util.readWork;
 var writeWork = util.writeWork;
 //数据目录
 var infoDir = util.infoDir;
-var Reporter = require("./lib/reporter");
-var reporter = util.reporter = new Reporter("publish2live", `live.html`);
 var packUtils = {};
 $$.each(conf.pack, name=>{
     packUtils[name] = require("./packUtil/" + name);
@@ -71,7 +72,6 @@ var cmsUtil = distUtils.cms;
 //临时目录
 var tmpDir = util.tmpDir;
 var htmlDir = util.getFolder(util.distHtmlDir, !/Live/.test(stage));
-var colHtmlDir = util.colHtmlDir;
 var readHtml = read.bind(null, htmlDir);
 var writeHtml = write.bind(null, htmlDir);
 var projectJson = util.projectJson;
@@ -87,13 +87,6 @@ var projectJson = util.projectJson;
         var channel = ENV.CMS_CHANNEL;
         if(!channel){
             ENV.CMS_CHANNEL = '0080';
-        }
-        if(util.isDir(colHtmlDir)){
-            try{
-                execSync(`cp -r ${colHtmlDir}/* ${util.distCmsDir}/ 2>/dev/null`);
-            }catch(e){
-
-            }
         }
         log("合并页面中的静态资源\n", 4);
         if(packUtils.base){
@@ -136,7 +129,7 @@ var projectJson = util.projectJson;
                 execSync(`mv ${backupFile} ${util.backupDir}/html.${label}.${time}.tar.gz`);
             }
             util.cpFile(`${util.distDir}/html.tar.gz`, backupFile);
-            if(util.syncTo.backup){
+            if(util.syncTo && util.syncTo.backup){
                 util.getFolder(util.syncTo.backup);
                 util.cpFile(backupFile, util.syncTo.backup);
             }
@@ -302,9 +295,7 @@ function upload2ImgCdn(clear){
                     distUtils.cdn.clearCache(diffiles);
                 }
             }
-            /*if(util.isDir(distStaticDirs[0]+"/collect")){
-                util.writeToLog(logfiles.collectres, colInfo.jscss, logfmts.collectres);
-            }*/
+            //util.writeToLog(logfiles.collectres, colInfo.jscss, logfmts.collectres);
 
             //备份
             util.writeInfo(".label", label);
@@ -339,9 +330,6 @@ function cpHtml(fullname, base){
     }
     var dir = path.dirname(fullname);
     var odir = util.getFolder(`${htmlDir}/${dir}`);
-    if (fs.existsSync(`${colHtmlDir}/${fullname}`)) { //优先使用html4col目录下的html
-        fullname = path.resolve(colHtmlDir, fullname);
-    }
     if(!util.isPreserved(base)){
         console.log(`Prepare Page: ${fullname}`);
     }
