@@ -27,7 +27,7 @@ module.exports = function(app){
         delProject: goDb.prepare("delete from pipelines where name=?"),
         addProject: goDb.prepare("insert into pipelines values(?, ?, ?, ?, ?)"),
         addUser: goDb.prepare("insert into users values(?, ?, '2')"),
-        findUser: goDb.prepare("select id from users where id=?")
+        findUser: goDb.prepare("select name from users where id=?")
     }
 
     app.get('/go/list', function(req, res) { //获取概览信息
