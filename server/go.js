@@ -1,6 +1,6 @@
 var fs = require('fs');
 var path = require('path');
-var request = require('request');
+var request = require('request').defaults({jar: true});
 var Store = require('../lib/store');
 var $$ = require('../lib/bowlder');
 var confFile = path.resolve(__dirname, 'conf.js');
@@ -197,10 +197,9 @@ module.exports = function(app){
 
 }
 
-function post(url, data, conf){
-    conf = $$.extend({jar: true}, conf);
+function post(url, data){
     return new Promise((resolve, reject) => {
-        request.post(url, data, conf, function(err, res, body){
+        request.post(url, {form: data}, function(err, res, body){
             if(err){
                 reject(err);
             }else{
@@ -211,10 +210,9 @@ function post(url, data, conf){
 }
 
 
-function get(url, conf){
-    conf = $$.extend({jar: true}, conf);
+function get(url){
     return new Promise((resolve, reject) => {
-        request.get(url, conf, function(err, res, body){
+        request.get(url, function(err, res, body){
             if(err){
                 reject(err);
             }else{
