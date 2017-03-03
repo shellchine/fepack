@@ -1,5 +1,4 @@
 var ENV = process.env;
-var program = require('commander');
 var mkdirp = require('mkdirp');
 var fs = require('fs');
 var pipeDir = "/var/lib/go-agent/pipelines";
@@ -7,12 +6,7 @@ if(!fs.existsSync(pipeDir)){
     mkdirp.sync(pipeDir);
 }
 
-program
-    .option('-p, --path [path]', 'Specify the project path relative to SVN root', parseInt)
-    .parse(process.argv);
-
-var projectDir = program.path || "tie/yun/admin";
-projectDir = projectDir.replace(/\\/g, '/').replace(/^\/|\/$/g, '');
+var projectDir = global.projectDir.replace(/\\/g, '/').replace(/^\/|\/$/g, '');
 var projectName = projectDir.replace(/\//g, '_');
 var workDir = `${pipeDir}/${projectName}`;
 
