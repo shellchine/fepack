@@ -90,7 +90,8 @@ module.exports = function(app){
             name: project,
             vcpath: vcpath,
             dest: dest,
-            omad: ''
+            omad: '',
+            materials: conf.vc.materials
         }, null, '');
         
         (async function(){

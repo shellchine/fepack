@@ -5,8 +5,10 @@ module.exports = {
     devHost2: "http://qa.developer.163.com",
     devHttpsHost: "https://qa.developer.163.com",
     vc: {
-        type: "git",
-        host: ""
+        type: "svn",
+        host: "https://svn.ws.netease.com/frontend",
+        localhost: "/var/frontend",
+        materials: `<svn url="https://svn.ws.netease.com/frontend/{{vcpath}}" username="xqwei" encryptedPassword="NrXHOLXkiJgDaBQASBOUVg==" autoUpdate="false" />`
     },
     lint: {
         css: ["css.base"],

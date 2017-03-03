@@ -1,18 +1,19 @@
-var fs = require('fs');
-var path = require('path');
-var confFile = path.resolve(__dirname, 'conf.js');
-if(!fs.existsSync(confFile)){
-    confFile = path.resolve(__dirname, 'conf.sample');
-}
-var conf = require(confFile);
+#!/usr/local/bin/node --harmony
 
-module.exports = [
-    {
-        pattern: new RegExp(`(${conf.cdnPattern}.*?\.js)`),
-        responder:  "http://127.0.0.1:8990/nproxy/$1"
-    },
-    {
-        pattern: new RegExp(`(${conf.cdnPattern}.*?\.css)`),
-        responder:  "http://127.0.0.1:8990/nproxy/$1"
-    }
-];
+var program = require('commander');
+var nproxy = require('nproxy');
+var conf = require('../package.json');
+
+program
+    .version(conf.version)
+    .option('-l, --list [list]', 'Specify the replace rule file')
+    .option('-p, --port [port]', 'Specify the port nproxy will listen on(8989 by default)', parseInt)
+    .option('-d, --debug', 'Enable debug mode')
+    .parse(process.argv);
+
+var port = program.port || 8989;
+
+nproxy(port, {
+    "responderListFilePath": program.list || "proxy.js",
+    "debug": !!program.debug
+});

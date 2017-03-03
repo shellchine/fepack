@@ -62,7 +62,7 @@ var infoDir = util.infoDir;
 var backupDir = util.backupDir;
 //临时目录
 var tmpDir = util.tmpDir;
-var htmlDir = util.getFolder(`${util.distDir}/html4dev`, true);
+var htmlDir = util.distHtmlDir = util.getFolder(`${util.distDir}/html4dev`, true);
 var readHtml = read.bind(null, htmlDir);
 var writeHtml = write.bind(null, htmlDir);
 var projectJson = util.projectJson;

@@ -4,7 +4,7 @@
           <value>{{dest}}</value>
         </variable>
         <variable name="GO_CONFIG">
-          <value>conf.rongcloud</value>
+          <value>conf.ne</value>
         </variable>{{omad}}
       </environmentvariables>
       <materials>

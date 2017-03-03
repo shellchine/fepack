@@ -1,7 +1,6 @@
 #!/usr/local/bin/node --harmony
 
 var program = require('commander');
-var nproxy = require('nproxy');
 var http = require('http');
 var express = require('express');
 var logger = require('morgan');
@@ -11,20 +10,12 @@ var depack = require('./depack');
 
 program
     .version(conf.version)
-    .option('-l, --list [list]', 'Specify the replace rule file')
-    .option('-p, --port [port]', 'Specify the port nproxy will listen on(8989 by default)', parseInt)
-    .option('-d, --debug', 'Enable debug mode')
+    .option('-p, --port [port]', 'Specify the port nproxy will listen on(8990 by default)', parseInt)
     .parse(process.argv);
 
-var port = program.port || 8989;
-
-nproxy(port, {
-    "responderListFilePath": program.list || "proxy.js",
-    "debug": !!program.debug
-});
+var expressPort = program.port || 8990;
 
 var app = express();
-var expressPort = port + 1;
 app.use(logger('combined'));
 app.use(express.static(__dirname + '/public'));
 app.use(bodyParser.urlencoded({ extended: false }));
