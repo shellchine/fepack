@@ -9,6 +9,9 @@ if(!fs.existsSync(pipeDir)){
 var projectDir = global.projectDir.replace(/\\/g, '/').replace(/^\/|\/$/g, '');
 var projectName = projectDir.replace(/\//g, '_');
 var workDir = `${pipeDir}/${projectName}`;
+if(!fs.existsSync(workDir)){
+    mkdirp.sync(workDir);
+}
 
 var env = {
     GO_PIPELINE_COUNTER: 1,

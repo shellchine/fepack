@@ -969,12 +969,6 @@ function procComment(tmp){
 exports.dev = async function(htmlDir){
     bdDir.inc = util.getFolder(`${htmlDir}/inc`);
     var vcpath = global.VCPATH;
-    var resBase = `${conf.devHost}/dist/${project}/collect`;
-    var colInfo = { //收集结果，包括html->inc->js/css之间的影射
-        inc: util.readFromLog(logfiles.collectinc, logfmts.collectinc),
-        jscss: util.readFromLog(logfiles.collectres, logfmts.collectres)
-    };
-    
     function parseAlias(quote, alias){
         state.alias = util.fulldir(alias, `/${vc.cdnfix}${vc.path}`);
         state.bowlderAlias = util.parseJson(`${vc.localhost}/${state.alias}`);
@@ -1086,80 +1080,26 @@ exports.dev = async function(htmlDir){
                 bdc.codes.js += `<script>bowlder.define.skin(${skinDefine})</script>\n`;
             }
 
-            var md5js = util.getMd5(bdc.codes.js, 1);
-            var md5css = util.getMd5(bdc.codes.css, 1);
-            var md5jsname = `foot~${md5js}.js`;
-            var md5cssname = `head~${md5css}.css`;
-            var liveJsFile = `${bdDir.res}/${md5jsname}`;
-            var liveCssFile = `${bdDir.res}/${md5cssname}`;
-
             file = file.replace(htmlDir + '/', '');
-            var devIncFootFile = `${bdDir.inc}/${file}`;
-            devIncFootFile = getCollectFileName(devIncFootFile, "foot");
-            var devIncHeadFile = `${bdDir.inc}/${file}`;
-            devIncHeadFile = getCollectFileName(devIncHeadFile, "head");
+            var devIncFootFile = getCollectFileName(`${bdDir.inc}/${file}`, "foot");
+            var devIncHeadFile = getCollectFileName(`${bdDir.inc}/${file}`, "head");
             if (!util.checkFolder(devIncFootFile)) {
                 global.exitERR(`无法创建 ${devIncFootFile} 所在目录。`);
             }
             //对于收集结果为空者，不再显示
-            var collectedScriptTag = bdc.codes.js ? `<script src="${resBase}/${md5jsname}" charset="utf-8"></script>\n` : "";
-            var collectedCssTag = bdc.codes.css ? `<link href="${resBase}/${md5cssname}" rel="stylesheet" />` : "";
             var liveIncFootFile = devIncFootFile;
             if (!util.checkFolder(liveIncFootFile)) {
                 global.exitERR(`无法创建 ${liveIncFootFile} 所在目录。`);
             }
 
-            if(bdc.codes.js){
-                colInfo.jscss[liveJsFile] = {
-                    valid: 1,
-                    vms: {},
-                    svnver: vcver,
-                    fcount: global.jscount
-                };
-                colInfo.jscss[liveJsFile].vms[vm] = 1;
-                log(`生成 ${liveJsFile}\n`);
-                writeTmp(liveJsFile, bdc.codes.js);
-            }
-
-            if(bdc.codes.css){
-                colInfo.jscss[liveCssFile] = {
-                    valid: 1,
-                    vms: {},
-                    svnver: vcver,
-                    fcount: global.csscount
-                };
-                colInfo.jscss[liveCssFile].vms[vm] = 1;
-                log(`生成 ${liveCssFile}\n`);
-                writeTmp(liveCssFile, bdc.codes.css);
-            }
-
             html = util.uniformStaticAddr(clearCollectTags(html));
 
             if(bdc.codes.first){
-                var md5first = util.getMd5(bdc.codes.first, 1);
-                var md5firstname = `first~${md5first}.js`;
-                var liveFirstFile = `${bdDir.res}/${md5firstname}`;
-                colInfo.jscss[liveFirstFile] = {
-                    valid: 1,
-                    vms: {},
-                    svnver: vcver,
-                    fcount: global.jscount
-                };
-                colInfo.jscss[liveFirstFile].vms[vm] = 1;
-                log(`生成 ${liveFirstFile}\n`);
-                writeTmp(liveFirstFile, bdc.codes.first);
                 html = html.replace(/<!--!include collector="(first)"-->/i, function(all, m1){
                     var devIncFirstFile = `${bdDir.inc}/${file}`;
                     devIncFirstFile = util.getCollectFileName(devIncFirstFile, "first");
-                    var liveIncFirstFile = devIncFirstFile;
                     //测试环境: inc/first~name.shtml
                     writeTmp(devIncFirstFile, bdc.codes.first);
-                    if(!colInfo.inc[devIncFirstFile]) colInfo.inc[devIncFirstFile] = {};
-                    if(colInfo.inc[devIncFirstFile].jscss != liveCssFile){
-                        colInfo.inc[devIncFirstFile].ver ++;
-                        colInfo.inc[devIncFirstFile].vm = url;
-                        colInfo.inc[devIncFirstFile].jscss = liveCssFile;
-                    }
                     return `<!--#include virtual="inc/${getCollectFileName(file,m1)}"-->`;
                 });
             }else{
@@ -1177,51 +1117,30 @@ exports.dev = async function(htmlDir){
                 var hasHead = 0;
                 html = html.replace(/<!--!include collector="(head)"\s*-->/i, function(all, m1){
                     hasHead = 1;
-                    var liveIncHeadFile = devIncHeadFile;
                     //测试环境: inc/head~name.shtml
                     writeTmp(devIncHeadFile, headContent);
-                    if(!colInfo.inc[devIncHeadFile]){
-                        colInfo.inc[devIncHeadFile] = {};
-                    }
-                    if (colInfo.inc[devIncHeadFile].jscss != liveCssFile) {
-                        colInfo.inc[devIncHeadFile].ver ++;
-                        colInfo.inc[devIncHeadFile].vm = url;
-                        colInfo.inc[devIncHeadFile].jscss = liveCssFile;
-                    }
                     return `<!--#include virtual="inc/${getCollectFileName(file, m1)}"-->`;
                 });
                 if(!hasHead){
                     //将收集样式内联放到页面开头
-                    delete colInfo.inc[devIncHeadFile];
                     html = `${bdc.codes.commonLink}${bdc.codes.css}${bdc.codes.headScript}`+html;
                 }
             }
 
-            //正式环境: inc/foot~name.html
-            var footContent = `${bdc.codes.commonJS}${collectedScriptTag}`;
-            if (footContent) {
+            //inc/foot~name.html
+            if (bdc.codes.js) {
                 var hasFoot = 0;
                 html = html.replace(/<!--!include collector="(foot)"\s*-->/, function(all, m1){
                     hasFoot = 1;
                     //测试环境: inc/foot~name.shtml
                     writeTmp(devIncFootFile, bdc.codes.js);
-                    if(!colInfo.inc[devIncFootFile]) colInfo.inc[devIncFootFile] = {};
-                    if (colInfo.inc[devIncFootFile].jscss != liveJsFile) {
-                        colInfo.inc[devIncFootFile].ver ++;
-                        colInfo.inc[devIncFootFile].vm = url;
-                        colInfo.inc[devIncFootFile].jscss = liveJsFile;
-                    }
                     return `<!--#include virtual="inc/${getCollectFileName(file, m1)}"-->`;
                 });
                 if(!hasFoot){
-                    delete colInfo.inc[devIncFootFile];
-                    collectedScriptTag = collectedScriptTag.replace('>', ' _print="2">');
                     html += bdc.codes.js;
                 }
             }
 
-
-            //生成正式环境用的html, html4col/index.shtml
             var htmlFile = path.resolve(htmlDir, file);
             util.checkFolder(htmlFile);
             writeTmp(htmlFile, util.expandFullPath(html)); //测试环境
@@ -1230,15 +1149,6 @@ exports.dev = async function(htmlDir){
             //process.exit(1);
         }
     });
-    util.writeToLog(logfiles.collectinc, colInfo.inc, logfmts.collectinc);
-    for(var key in colInfo.jscss){
-        if(!colInfo.jscss[key].valid){
-            delete(colInfo.jscss[key]);
-        }else{
-            colInfo.jscss[key].vm = Object.keys(colInfo.jscss[key].vms).join(',');
-        }
-    }
-    util.writeToLog(logfiles.collectres, colInfo.jscss, logfmts.collectres);
 }
 
 async function fetchCollectHtml(file){
@@ -1392,6 +1302,7 @@ function clearCollectTags(html){           //必须在替换cdn路径之前使�
 }
 
 function clearCollectTag(spaces, attr, cont){
+    cont = cont || '';
     if (/ _drop(=| |\/|>)/i.test(attr)) {
         return "";
     }
@@ -1468,7 +1379,7 @@ exports.live = async function(htmlDir){
         collectComments = [];
         state = {commonCode: "commonJSFirst"};
         global.jscount = global.csscount = 0;
-        //stripe /var/fepack/dist/tie_yun_sitegov/html4dev
+        //stripe /var/fepack/dist/tie_yun_sitegov/html
         var vm = file.replace(util.distDir+'/', '').replace(/^[^\/]*/, ''); 
         var url = vc.devpath + vm; //http://127.0.0.1:8990/tie/yun/sitegov/info.html
         log(`\n开始收集 ${file}: `, 2, 1);
@@ -1542,17 +1453,11 @@ exports.live = async function(htmlDir){
             var liveCssFile = `${bdDir.res}/${md5cssname}`;
 
             file = file.replace(htmlDir + '/', '');
-            var devIncFootFile = `${bdDir.inc}/${file}`;
-            devIncFootFile = getCollectFileName(devIncFootFile, "foot");
-            var devIncHeadFile = `${bdDir.inc}/${file}`;
-            devIncHeadFile = getCollectFileName(devIncHeadFile, "head");
-            if (!util.checkFolder(devIncFootFile)) {
-                global.exitERR(`无法创建 ${devIncFootFile} 所在目录。`);
-            }
+            var liveIncFootFile = getCollectFileName(`${bdDir.inc}/${file}`, "foot");
+            var liveIncHeadFile = getCollectFileName(`${bdDir.inc}/${file}`, "head");
             //对于收集结果为空者，不再显示
             var collectedScriptTag = bdc.codes.js ? `<script src="${resBase}/${md5jsname}" charset="utf-8"></script>\n` : "";
             var collectedCssTag = bdc.codes.css ? `<link href="${resBase}/${md5cssname}" rel="stylesheet" />` : "";
-            var liveIncFootFile = devIncFootFile;
             if (!util.checkFolder(liveIncFootFile)) {
                 global.exitERR(`无法创建 ${liveIncFootFile} 所在目录。`);
             }
@@ -1598,16 +1503,14 @@ exports.live = async function(htmlDir){
                 log(`生成 ${liveFirstFile}\n`);
                 writeTmp(liveFirstFile, bdc.codes.first);
                 html = html.replace(/<!--!include collector="(first)"-->/i, function(all, m1){
-                    var devIncFirstFile = `${bdDir.inc}/${file}`;
-                    devIncFirstFile = util.getCollectFileName(devIncFirstFile, "first");
-                    var liveIncFirstFile = devIncFirstFile;
+                    var liveIncFirstFile = util.getCollectFileName(`${bdDir.inc}/${file}`, "first");
                     //正式环境: inc/first~name.shtml
                     writeTmp(liveIncFirstFile, `${bdc.codes.commonJSFirst}<script src="${resBase}/${md5firstname}" charset="utf-8"></script>`);
-                    if(!colInfo.inc[devIncFirstFile]) colInfo.inc[devIncFirstFile] = {};
-                    if(colInfo.inc[devIncFirstFile].jscss != liveCssFile){
-                        colInfo.inc[devIncFirstFile].ver ++;
-                        colInfo.inc[devIncFirstFile].vm = url;
-                        colInfo.inc[devIncFirstFile].jscss = liveCssFile;
+                    if(!colInfo.inc[liveIncFirstFile]) colInfo.inc[liveIncFirstFile] = {};
+                    if(colInfo.inc[liveIncFirstFile].jscss != liveCssFile){
+                        colInfo.inc[liveIncFirstFile].ver ++;
+                        colInfo.inc[liveIncFirstFile].vm = url;
+                        colInfo.inc[liveIncFirstFile].jscss = liveCssFile;
                     }
                     return `<!--#include virtual="inc/${getCollectFileName(file,m1)}"-->`;
                 });
@@ -1627,22 +1530,21 @@ exports.live = async function(htmlDir){
                 var hasHead = 0;
                 html = html.replace(/<!--!include collector="(head)"\s*-->/i, function(all, m1){
                     hasHead = 1;
-                    var liveIncHeadFile = devIncHeadFile;
                     //正式环境: inc/head~name.shtml
                     writeTmp(liveIncHeadFile, headContent);
-                    if(!colInfo.inc[devIncHeadFile]){
-                        colInfo.inc[devIncHeadFile] = {};
+                    if(!colInfo.inc[liveIncHeadFile]){
+                        colInfo.inc[liveIncHeadFile] = {};
                     }
-                    if (colInfo.inc[devIncHeadFile].jscss != liveCssFile) {
-                        colInfo.inc[devIncHeadFile].ver ++;
-                        colInfo.inc[devIncHeadFile].vm = url;
-                        colInfo.inc[devIncHeadFile].jscss = liveCssFile;
+                    if (colInfo.inc[liveIncHeadFile].jscss != liveCssFile) {
+                        colInfo.inc[liveIncHeadFile].ver ++;
+                        colInfo.inc[liveIncHeadFile].vm = url;
+                        colInfo.inc[liveIncHeadFile].jscss = liveCssFile;
                     }
                     return `<!--#include virtual="inc/${getCollectFileName(file, m1)}"-->`;
                 });
                 if(!hasHead){
                     //将收集样式内联放到页面开头
-                    delete colInfo.inc[devIncHeadFile];
+                    delete colInfo.inc[liveIncHeadFile];
                     html = `${bdc.codes.commonLink}<style>\n${bdc.codes.css}</style>${bdc.codes.headScript}`+html;
                 }
             }
@@ -1655,29 +1557,27 @@ exports.live = async function(htmlDir){
                     hasFoot = 1;
                     //正式环境: inc/foot~name.shtml
                     writeTmp(liveIncFootFile, footContent);
-                    if(!colInfo.inc[devIncFootFile]) colInfo.inc[devIncFootFile] = {};
-                    if (colInfo.inc[devIncFootFile].jscss != liveJsFile) {
-                        colInfo.inc[devIncFootFile].ver ++;
-                        colInfo.inc[devIncFootFile].vm = url;
-                        colInfo.inc[devIncFootFile].jscss = liveJsFile;
+                    if(!colInfo.inc[liveIncFootFile]) colInfo.inc[liveIncFootFile] = {};
+                    if (colInfo.inc[liveIncFootFile].jscss != liveJsFile) {
+                        colInfo.inc[liveIncFootFile].ver ++;
+                        colInfo.inc[liveIncFootFile].vm = url;
+                        colInfo.inc[liveIncFootFile].jscss = liveJsFile;
                     }
                     return `<!--#include virtual="inc/${getCollectFileName(file, m1)}"-->`;
                 });
                 if(!hasFoot){
-                    delete colInfo.inc[devIncFootFile];
+                    delete colInfo.inc[liveIncFootFile];
                     collectedScriptTag = collectedScriptTag.replace('>', ' _print="2">');
                     html = html.replace(/(<\/body>|$)/i, hasBowlder ? footContent : bdc.codes.commonJS+collectedScriptTag+'$1');  //无bowlder.js的纯组件使用_print="2"
                 }
             }
 
 
-            //生成正式环境用的html, html4col/index.shtml
             var htmlFile = path.resolve(htmlDir, file);
             util.checkFolder(htmlFile);
             writeTmp(htmlFile, cleanColPath(html)); //正式环境
             log(`收集结束: ${htmlFile}\n`);
             global.VCPATH = vcpath;
-            //process.exit(1);
         }
     });
     util.writeToLog(logfiles.collectinc, colInfo.inc, logfmts.collectinc);
@@ -1689,6 +1589,11 @@ exports.live = async function(htmlDir){
         }
     }
     util.writeToLog(logfiles.collectres, colInfo.jscss, logfmts.collectres);
+
+    //压缩、上传
+    //collect/* => static/*
+
+    //在html中替换cdn地址
 
     function cleanHttpPath(str){
         str = str.replace(/(^|;)http:\/\/.*?\//g, '$1/');

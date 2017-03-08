@@ -22,7 +22,7 @@
         });
     }
     var host = location.origin.replace(/:\d+|$/, ":8990");
-    $("head").append(`<link type="text/css" rel="stylesheet" href="${host}/go17.css" />`);
+    $("head").append(`<link type="text/css" rel="stylesheet" href="${host}/gohtml/go17.css" />`);
 
     var stagePath, pipename, pageType = (function(){ //当前页面类型: index/overview/history
         var url = location.href;
@@ -39,8 +39,8 @@
     })();
     
     $.async(function*(){ //各类页面初始化
-        yield $.getScript(host + "/utils.js");
-        yield $.getScript(host + "/goconf.js");
+        yield $.getScript(host + "/gohtml/utils.js");
+        yield $.getScript(host + "/gohtml/goconf.js");
         var scope = window.goConf;
         scope.groups.forEach(group => {
             group.dir2dest = {};

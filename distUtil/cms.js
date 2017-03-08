@@ -74,7 +74,7 @@ var cms_topicids = {
 };
 
 var authFile = conf.cacheDir + "/info/.cmsauth";
-if(!fs.existsSync(authFile)){
+if(!ENV.GO_TEST && !fs.existsSync(authFile)){
     var msg = "CMS认证文件异常。";
     if(global.exitERR){
         global.exitERR(msg);
