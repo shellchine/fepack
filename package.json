@@ -17,6 +17,7 @@
     "body-parser": "^1.16.0",
     "child_process": "^1.0.2",
     "commander": "^2.9.0",
+    "connect-ssi": "^1.1.1",
     "crypto": "0.0.3",
     "express": "^4.14.0",
     "iconv-lite": "^0.4.15",

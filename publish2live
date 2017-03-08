@@ -51,11 +51,14 @@ var writeWork = util.writeWork;
 //数据目录
 var infoDir = util.infoDir;
 var packUtils = {};
+var distUtils = global.distUtils = {};
+var distFns = [], packFns = [];
 $$.each(conf.pack, name=>{
     packUtils[name] = require("./packUtil/" + name);
+    if(typeof packUtils[name].live == 'function'){
+        packFns.push(packUtils[name].live);
+    }
 });
-var distUtils = global.distUtils = {};
-var distFns = [];
 $$.each(conf.dist, name=>{
     distUtils[name] = require("./distUtil/" + name);
     if(distUtils[name] && $$.isFunction(distUtils[name].publish)){
@@ -80,6 +83,7 @@ var projectJson = util.projectJson;
     if (!/Live/.test(stage)) {         //publishStage, publishQAStage
         await cp4live();
         await parseSSI(htmlDir);     //将html中的外部ssi全部内联
+        await Promise.all(packFns.map(fn => fn(htmlDir)));  //自定义打包流程: bowlder, vue, nej, regular...
     }
     // 处理要发布到cms的文件
     if(cmsUtil && util.isDir(util.distCmsDir)){

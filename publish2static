@@ -68,11 +68,17 @@ var writeHtml = write.bind(null, htmlDir);
 var projectJson = util.projectJson;
 
 var distUtils = global.distUtils = {};
-var distFns = [];
+var distFns = [], packFns = [];
 $$.each(conf.devDist, name=>{
     distUtils[name] = require("./distUtil/" + name);
     if(distUtils[name] && $$.isFunction(distUtils[name].publish)){
         distFns.push(distUtils[name].publish);
+    }
+});
+$$.each(conf.pack, name=>{
+    var tmp = require("./packUtil/" + name);
+    if(typeof tmp.dev == 'function'){
+        packFns.push(tmp.dev);
     }
 });
 if(fs.existsSync(`${infoDir}/goscript/dist_dev.js`)){
@@ -159,6 +165,8 @@ util.printTime();
             parseRes(htmlDir);     //处理资源路径
         }
     }
+    
+    await Promise.all(packFns.map(fn => fn(htmlDir)));  //自定义打包流程: bowlder, vue, nej, regular...
 
     // 同步到后端服务器(非云主机)
     if (util.syncTo || projectJson[cloudEnv] || ENV[cloudEnv]) {
@@ -170,7 +178,7 @@ util.printTime();
     execSync(`cd ${htmlDir}; tar zcf ../html4dev.tar.gz *`);
     reporter.set("tarLink", `${conf.devHost2}/dist/${project}/html4dev.tar.gz`);
 
-    distFns.forEach(fn => fn());
+    await Promise.all(distFns.map(fn => fn()));
 
     reporter.set("toperr", errorArr.join("\n").replace(/</g, '&lt;').replace(/>/g, '&gt;'));
     reporter.save();

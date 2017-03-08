@@ -17,7 +17,7 @@ var expressPort = program.port || 8990;
 
 var app = express();
 app.use(logger('combined'));
-app.use(express.static(__dirname + '/public'));
+app.use('/gohtml', express.static(__dirname + '/public'));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
@@ -25,8 +25,8 @@ app.all('/go/*', function(req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");  
     res.header("Access-Control-Allow-Headers", "X-Requested-With");  
     res.header("Access-Control-Allow-Methods","PUT,POST,GET,DELETE,OPTIONS");
-    next();  
-});  
+    next();
+});
 
 require('./go')(app);
 

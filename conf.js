@@ -1,7 +1,8 @@
 module.exports = {
     firm: "netease",
     cacheDir: "/var/fepack",
-    devHost: "http://static.f2e.netease.com",
+    //devHost: "http://static.f2e.netease.com",
+    devHost: "http://127.0.0.1:8990",
     devHost2: "http://qa.developer.163.com",
     devHttpsHost: "https://qa.developer.163.com",
     vc: {
@@ -16,7 +17,7 @@ module.exports = {
         html: ["html.base"]
     },
     devDist: ["omad"],
-    pack: ["base"],
+    pack: ["base", "bdc"],
     compress: {
         js: 2,
         css: 1
@@ -52,6 +53,7 @@ module.exports = {
         { base: "/var/house_inc", devOnly: true },
         { base: "/var/recm_inc" },
         { base: "/var/recm_inc", devOnly: true },
-        { base: "/var/video_inc" }
+        { base: "/var/video_inc" },
+        { base: "/var/money_inc" }
     ]
 }

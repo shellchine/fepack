@@ -3,6 +3,9 @@ var path = require('path');
 var request = require('request').defaults({jar: true});
 var Store = require('../lib/store');
 var $$ = require('../lib/bowlder');
+var proc = require('child_process');
+var express = require('express');
+var connectSSI = require('connect-ssi')
 var confFile = path.resolve(__dirname, 'conf.js');
 if(!fs.existsSync(confFile)){
     confFile = path.resolve(__dirname, 'conf.sample');
@@ -12,6 +15,17 @@ var conf = require(confFile);
 var host = "http://127.0.0.1:8153";
 
 module.exports = function(app){
+    var distDir = `${conf.cacheDir}/dist`;
+    app.use(connectSSI({
+	    ext: '.html',
+        baseDir: conf.cacheDir
+    }));
+    app.use(connectSSI({
+	    ext: '.shtml',
+        baseDir: conf.cacheDir
+    }));
+    app.use('/dist', express.static(distDir));
+    app.use(express.static(conf.vcDir));
     var infoDir = `${conf.cacheDir}/info`;
     var pwFile = `${infoDir}/.goaccess`;
     if(!fs.existsSync(pwFile)){
@@ -47,6 +61,18 @@ module.exports = function(app){
             res.jsonp({
                 pipelines: pipelines,
                 admins: admins
+            });
+        })();
+    });
+
+    app.get('/go/svnup/:project', function(req, res) { //更新本地SVN目录
+        var project = req.params.project;
+        var ver = req.query.ver || 'HEAD';
+        var partners = {};
+        (async function(){
+            proc.execSync(`svn up`);
+            res.jsonp({
+
             });
         })();
     });

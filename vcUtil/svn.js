@@ -36,7 +36,6 @@ module.exports = function(svn){
             console.log(`Writer: ${svn.writer}`);
         }
     }
-    svn.localpath = path.resolve(svn.localhost, svn.cdnfix+svn.path);  //本地仓库目录
 
     svn.publish = {
         dev: function(ver, dir){ //发布未压缩版
