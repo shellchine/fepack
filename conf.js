@@ -1,8 +1,8 @@
 module.exports = {
     firm: "netease",
     cacheDir: "/var/fepack",
-    //devHost: "http://static.f2e.netease.com",
-    devHost: "http://127.0.0.1:8990",
+    devHost: "http://static.f2e.netease.com",
+    // devHost: "http://127.0.0.1:8990",
     devHost2: "http://qa.developer.163.com",
     devHttpsHost: "https://qa.developer.163.com",
     vc: {

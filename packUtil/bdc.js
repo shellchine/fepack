@@ -304,7 +304,7 @@ function inlineSSI(file){  //输出内联ssi
     var content = readWork(file).replace(/\s*<meta\s+name="cms_id"[\s\S]*?>\s*/ig, '');
     content = content.replace(/\s*<!--!include\s*collector=.*?-->\s*/ig, '')
         .replace(/<!--#include\s+(file|virtual)=(['"])(.*?)\2\s*-->/ig, function(all, m1, m2, m3){
-            return util.fetchSSI(m3, absdir, m1);
+            return fetchSSI(m3, absdir, m1);
         });
     return content;
 }
