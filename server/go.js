@@ -117,7 +117,7 @@ module.exports = function(app){
             vcpath: vcpath,
             dest: dest,
             omad: '',
-            materials: conf.vc.materials
+            materials: $$.template.replace(conf.vc.materials, {vcpath:vcpath})
         }, null, '');
         
         (async function(){
