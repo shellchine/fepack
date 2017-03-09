@@ -628,7 +628,7 @@ exports.live = async function(htmlDir){
         if(fmt == '.js'){
             util.compressJs(file, outfile);
         }else if(fmt == '.css'){
-            util.compressCss(file, outfile);
+            util.compressCss([file], outfile);
         }
     });
 }

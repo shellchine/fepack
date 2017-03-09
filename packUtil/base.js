@@ -249,13 +249,13 @@ var parseCssAddr = async function(tmp, spaces, groups) { //多个link合并时�
         if (/rel=(['"])stylesheet/.test(tmp)){
             if (/_print\s*=\s*(['"])(\S+?)\1/i.test(tmp)) {
                 print = RegExp.$2;
-            } else if(!/ (_group|_drop|_keep)/.test(tmp)){
+            } else if(!/ (_group|_drop)/.test(tmp)){ //_keep时如遇到skipRes也打印代码
                 if (ENV.PRINT_CSS ||
                     (projectJson.skipRes && !/analysis/.test(url))){
                     print = 1;
                 }
             }
-            if(ENV.GO_TEST && ~url.indexOf(`/dist/${project}/`)){
+            if(ENV.GO_TEST && ~url.indexOf(`/dist/${project}/collect/`)){
                 print = 0;
             }
             if (print) {
@@ -329,7 +329,7 @@ var parseJsAddr = async function(tmp, spaces, groups) {
                 print = 1;
             }
         }
-        if(ENV.GO_TEST && ~url.indexOf(`/dist/${project}/`)){
+        if(ENV.GO_TEST && ~url.indexOf(`/dist/${project}/collect/`)){
             print = 0;
         }
         if (print) {   //js打印成<script>
