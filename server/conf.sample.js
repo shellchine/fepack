@@ -8,7 +8,8 @@ module.exports = {
     vc: {
         type: "svn",
         host: "https://svn.ws.netease.com/frontend",
-        localhost: "/var/frontend"
+        localhost: "/var/frontend",
+        materials: `<svn url="https://svn.ws.netease.com/frontend/{{vcpath}}" username="xqwei" encryptedPassword="NrXHOLXkiJgDaBQASBOUVg==" autoUpdate="false" />`
     }
 
 }
