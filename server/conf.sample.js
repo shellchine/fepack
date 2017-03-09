@@ -9,7 +9,7 @@ module.exports = {
         type: "svn",
         host: "https://svn.ws.netease.com/frontend",
         localhost: "/var/frontend",
-        materials: `<svn url="https://svn.ws.netease.com/frontend/{{vcpath}}" username="xqwei" encryptedPassword="NrXHOLXkiJgDaBQASBOUVg==" autoUpdate="false" />`
+        materials: `<svn url="https://svn.ws.netease.com/frontend/{{vcpath}}" username="web" encryptedPassword="0554GP5PdngKqsh3YbHJhw==" autoUpdate="false" />`
     }
 
 }
