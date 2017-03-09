@@ -255,6 +255,9 @@ var parseCssAddr = async function(tmp, spaces, groups) { //多个link合并时�
                     print = 1;
                 }
             }
+            if(ENV.GO_TEST && ~url.indexOf(`/dist/${project}/`)){
+                print = 0;
+            }
             if (print) {
                 var content = await util.fetchUrl(url);
                 if (content) {
@@ -297,7 +300,8 @@ var parseCssAddr = async function(tmp, spaces, groups) { //多个link合并时�
     return `<link${tmp}>${spaces}`;
 }
 
-var parseJsAddr = async function(tmp, spaces, groups) { //多个script合并时，将第一个script替换为合并后的script，其余删除
+var parseJsAddr = async function(tmp, spaces, groups) {
+    //多个script合并时，将第一个script替换为合并后的script，其余删除
     var group = '';
     var print = '';
     var packedJs;
@@ -324,6 +328,9 @@ var parseJsAddr = async function(tmp, spaces, groups) { //多个script合并时�
                 (projectJson.skipRes && !/analysis/.test(url))) {
                 print = 1;
             }
+        }
+        if(ENV.GO_TEST && ~url.indexOf(`/dist/${project}/`)){
+            print = 0;
         }
         if (print) {   //js打印成<script>
             var compressed = '';

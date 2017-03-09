@@ -38,27 +38,15 @@ var writeTmp = util.writeTmp;
 var readWork = util.readWork;
 var writeWork = util.writeWork;
 var vcver = ENV.GO_REVISION || 1;  //代码仓库版本
-var headScriptMap = {
+util.headScriptMap = {
     'http://img1.cache.netease.com/cnews/js/ntes_jslib_1.x.js': 1,
     'http://img1.cache.netease.com/f2e/lib/js/ne.js': 1
 };
-var cdnDefines = {
-    '/modules/echarts/lib/echarts.js': 'http://img1.cache.netease.com/f2e/modules/echarts/lib/echarts.js'
-};
-var firstCollector = '<!--!include collector="first"-->';
-var collectComments = [];
-var js2first = 'js';
-
-function cdnDefine(file){
-    return (projectJson.excludeAMD && projectJson.excludeAMD[file]) || cdnDefines[file];
-}
-var tmpDir = util.tmpDir;
 var bdDir = {
     res: util.getFolder(`${util.distDir}/collect`, 1) //收集后的js/css
 };
 var logfiles = util.logfiles, logfmts = util.logfmts;
 var collectorRex = /<!--!include\s+collector=|<script\s.*?bowlder[\-\d\.]*?\.js/;
-var state; //单个页面收集过程中的状态变量
 
 function collectFiles(htmlDir){ //找到需要处理的文件列表
     var files = [];
@@ -72,910 +60,26 @@ function collectFiles(htmlDir){ //找到需要处理的文件列表
     return files;
 }
 
-function DevCollector(){ //测试阶段收集器
-    this.parentHtmls = {}; //已经收集过的主页面
-    this.defined = {}; //收集过的module js
-    this.predefined = {};  //和defined形成补充，用于避免死循环
-    this.collectedCss = [];
-    this.skins = {};
-    this.css = [];  //@import语法，供第一阶段测试，包含_drop="true"的内容
-    this.codes = {js:'', css:'', commonLink:'', headScript:'', first:'', commonJSFirst:'', commonJS:'', purejs:''};
+var fetchCollectHtml = util.fetchCollectHtml = async function (file){
+    log(`生成收集用的html(${file}) ..\n`);
+    var html = await util.fetchUrl(file);
+    var abspath = path.dirname(file.replace(conf.devHost, vc.localhost));
+    var modulePath = (abspath + '/')
+        .replace(vc.localhost, '')
+        .replace(util.distHtmlDir +'/', `/${vc.cdnfix}${vc.path}/`);
+    //fix @ path
+    html = html.replace(/((href|ne-module|ne-plugin|ne-extend)=['"])\@/g, '$1'+modulePath)
+        .replace(/<!--#include\s+(file|virtual)=(['"])(.*?)\2\s*-->/ig, function(all, m1, m2, m3){
+            return fetchSSI(m3, abspath, m1);
+        });
+    return html;
 }
-DevCollector.prototype = {
-    init: async function(html, htmlfile, isSub){
-        var bdc = this;
-        bdc.urlRoot = `${conf.devHost}/${vc.cdnfix}` + global.VCPATH;
-        state.commonCode = "commonJSFirst";
-        var reg = new RegExp(`([^<>]*?)\\sne-module\\s*=\\s*(['"])([^'"<]*?)\\2((>|[\\s\\S]*?[^\\%]>)[\\s\\S]*?<[^!])|${firstCollector}`, 'ig');
-        html = await util.replaceAsync(html, reg, async function(all, m1, m2, m3, m4){
-            return await bdc.procModule(m1, m3, m4, all)
-        });
-        if(!isSub){
-            bdc.codes.purejs += bdc.codes.js; //此处缓存为了避免procPlugin时，碰到firstCollector便把所有js均放到codes.first内
-            bdc.codes.js = '';
-        }
-        state.commonCode = "commonJSFirst";
-        html = html.replace(new RegExp(`([^<>]*?)\\sne-plugin\\s*=\\s*(['"])([^'"<]*?)\\2|${firstCollector}`, 'g'), function(all, m1, m2, m3){
-            return bdc.procPlugin(m1, m3, all);
-        });
-        //project.json里指定的打包内容
-        var depends = projectJson.depends[htmlfile];
-        var dependsExclude = projectJson.dependsExclude && projectJson.dependsExclude[htmlfile];
-        if(depends){
-            log(`打包额外的模块: ${depends}\n`);
-            depends = depends.replace(/(^| )\//g, `$1${vc.localhost}/`);
-            var excludes = {};
-            if (dependsExclude) {
-                dependsExclude = dependsExclude.replace(/(^| )\//g, `$1${vc.localhost}/`);
-                util.lsr('.', dependsExclude).forEach(function(file){
-                    excludes[file] = 1;
-                });
-            }
-            await $$.reducePromise(util.lsr('.', depends), async function(file){//额外模块
-                if(!fs.existsSync(file) || excludes[file]){
-                    return;
-                }
-                var moduleid = util.fulldir(file, "/" + vc.cdnfix + vc.path);
-                moduleid = moduleid.replace(vc.localhost, '');
-                if(/\.html$/.test(file)){
-                    log(`Skin: ${file}\n`);
-                    util.stack(`出错文件: ${file}`);
-                    var tmp = readWork(file);
-                    if(/<\/html>\s*$/i.test(tmp)){ //不把完整的demo页面作为皮肤
-                        return;
-                    }
-                    var modulePath = moduleid.replace(/[^/]*$/, '');
-                    var moduleHost = '/';
-                    if(~moduleid.indexOf('//')){
-                        moduleHost = moduleid;
-                        moduleHost = moduleHost.replace(/(\/\/.*?\/).*/, '$1');
-                    }
-                    //fix @ path
-                    tmp = tmp.replace(/((href|ne-module|ne-plugin|ne-extend)=['"])\@\//g, `$1${moduleHost}`);
-                    tmp = tmp.replace(/((href|ne-module|ne-plugin|ne-extend)=['"])\@/g, `$1${modulePath}`);
-                    bdc.skins[moduleid] = bdc.fixSkin(tmp);
-                    moduleid = moduleid.replace(/\.html$/, '.js');
-                    if(!fs.existsSync(`${vc.localhost}${moduleid}`)){
-                        moduleid = moduleid.replace(/\.\w+\.js$/, '.js');
-                    }
-                    util.stack([]);
-                }
-                if(/\/\w+$/.test(moduleid)){
-                    moduleid += ".js";
-                }
-                if(/\.js/.test(moduleid) && fs.existsSync(`${vc.localhost}${moduleid}`)){
-                    await bdc.procModule("", moduleid, "");
-                }
-            });
-        }
-        return html;
-    },  
-    fixSkin: async function (tmp){
-        var bdc = this;
-        tmp = await (new DevCollector).init(tmp, '', 1);
-        tmp = tmp.replace(/<link ([\s\S]*?)>/ig, function(all, m1){
-            return bdc.moduleLink(m1);
-        });
-        tmp = tmp.replace(/<img([^>]*?)>/ig, function(all, m1){
-            return util.expandIMGPath(m1);
-        });
-        tmp = tmp.replace(/\t/g, ' ');
-        return tmp;
-    },
-    addCss: function (file){
-        var bdc = this;
-        if(bdc.collectedCss.indexOf(file) != -1){
-            return;
-        }
-        bdc.collectedCss.push(file);
-    },
-    moduleLink: function (attr){
-        var bdc = this;
-        if (/href\s*=\s*(['"])\s*(\S+)\s*\1/.test(attr)){
-            bdc.addCss(RegExp.$2);
-            return "";
-        }
-        return `<link ${attr}>`;
-    },
-    addJs: async function (file, referURL){ //普通js依赖(!*.js)
-        var bdc = this;
-        //为正式版收集js
-        var revert;
-        await $$.reducePromise(file.split(/\s*;\s*/), async function(src){
-            var bowlderSrc = 0;
-            src = util.fulldir(src, referURL);
-            var gbk = 0;
-            src = src.replace(/\@([\w\-]+)$/, function(all, m1){
-                var charset = m1;
-                if (/gb/i.test(charset)) {
-                    gbk = 1;
-                }
-            });
-            if (!bdc.defined["!"+src]) {
-                if (headScriptMap[src]) {
-                    bdc.codes.headScript += `<script src="${src}"></script>\n`;
-                } else if (/\.com\/(common|libs)\//.test(src)) {
-                    bdc.codes[state.commonCode] += `<script src="${src}"></script>\n`;
-                } else if (/\.com\/(modules\/bowlder\-[\d\.]+?\.js([\#\?].*)?)/.test(src)) {
-                    bdc.codes.commonJSFirst += `<script src="${vc.resRoot}/${RegExp.$1}"></script>\n`;
-                } else {
-                    global.jscount ++;
-                }
-                bdc.defined[`!${src}`] = 1;
-            }
-        });
-    },
-    procExtend: function (filestr){ //收集extend中的模块
-        var bdc = this;
-        var files = [];
-        filestr.split(/\s*;\s*/).forEach(function(file){
-            if (!/^\%/.test(file)) {
-                if(!/{{.*?}}/.test(file)){
-                    file = util.fulldir(file, bdc.urlRoot);
-                }
-            }
-            files.push(file);
-        });
-        var fileStr = files.join("\n;");
-        return ` ne-extend="${fileStr}"`;
-    },
-    procText: function (fileURL){ //收集text类型define
-        var bdc = this;
-        if (!bdc.defined[`text!${fileURL}`]) {
-            var text = util.fetchUrl(fileURL)
-                .replace(/\n/g, '\\n')
-                .replace(/"/g, '\\"');
-            var safename = fileURL.replace(/^http:\/\/.*?\//, '/');
-            bdc.codes.js += `bowlder.define("${safename}","${text}");\n`;
-            bdc.defined[`text!${fileURL}`] = 1;
-        }
-    },
-    procDefine: async function (fileURL, avoidLock){ //收集各种define
-        var bdc = this;
-        var jstmp = '';
-        if(/\%/.test(fileURL) || (avoidLock && bdc.predefined[fileURL])){
-            return;
-        }else if(!/reg\.163\.com/.test(fileURL)){  //不打包常用类库或urs库
-            bdc.predefined[fileURL] = 1;
-            if (!bdc.defined[fileURL]) {
-                bdc.defined[fileURL] = 1;
-            } else {
-                jstmp = bdc.defined[fileURL];
-            }
-        }
-        return jstmp;
-    },
-    procPlugin: function (pre, basenames, match){
-        var bdc = this;
-        if(match == firstCollector){
-            state.commonCode = "commonJS";
-            bdc.codes.first += bdc.codes.js;
-            bdc.codes.js = '';
-            return match;
-        }
-        log(`Plugin: ${basenames}\n`);
-        var filearr = [];
-        basenames.split(/\s*;\s*/).forEach(function(basename){
-            var file = util.fulldir(basename, bdc.urlRoot);
-            if(file){
-                filearr.push(file);
-            }
-        });
-        var filenames = filearr.join(";");
-        if(filenames){
-            var pluginAttr = `ne-plugin="${filenames}"`;
-            return pre+' '+pluginAttr;
-        }else{
-            return pre;
-        }
-    },
-    procModule: async function (pre, basename, content, match){
-        var bdc = this;
-        if(match == firstCollector){
-            state.commonCode = "commonJS";
-            bdc.codes.first += bdc.codes.js;
-            bdc.codes.js = '';
-            return match;
-        }
-        log(`Module: ${basename}\n`);
-        var file =  util.fulldir(basename, bdc.urlRoot);
-        if(/\/\w+$/.test(file)){
-            file += ".js";
-        }
-        var format = path.extname(file);
-
-        var moduleAttr = 'ne-module=""'; //html文件的ne-module值置空
-        if(format != 'html') {
-            var safename = file;
-            moduleAttr = `ne-module="${safename}"`;
-        }
-        pre = pre.replace(/\s*ne-props=(['"]).*?\1/, '');
-        content = content.replace(/\s*ne-props=(['"]).*?\1/, '');
-
-        var result = `${pre} ${moduleAttr}${content}`;
-        result = result.replace(/^([^>]*?)\s+ne-extend\s*=\s*(['"])\s*(\S+?)\s*\2/, function(all, m1, m2, m3){
-            return m1+bdc.procExtend(m3);
-        });
-        return result;
-    },
-    parseDeps: async function (arrStr, referURL){         //js define中的依赖
-        var bdc = this;
-        arrStr = arrStr.replace(/^\[\s*,\s*/, '[');
-        var deps = JSON.parse(arrStr);
-        var newdeps = [];
-        await $$.reducePromise(deps, async function(file){
-            util.stack(`来源文件: ${referURL}`);
-            log(`depends: ${file}, ${referURL}\n`);
-            if (/\.css/.test(file)) {
-                file = util.fulldir(file, referURL);
-                bdc.addCss(file);
-            } else if (file.substr(0,1)=='!') { //不符amd规范的js
-                file = file.substr(1);
-                await bdc.addJs(file, referURL);
-            } else {    //递归收集，期望别死循环..
-                var cdnDefine = cdnDefine(file);
-                if(cdnDefine){
-                    newdeps.push(cdnDefine);
-                }else{
-                    newdeps.push(file);
-                    if (!/\%/.test(file) && file != 'exports' && file != 'require') {
-                        file = file.replace(/(.*?)\!/, ''); //去掉plugin!前缀
-                        var depType = RegExp.$1;
-                        file = util.fulldir(file, referURL);
-                        if (depType == 'text') {
-                            bdc.procText(file);
-                        }
-                    }
-                }
-                util.stack([]);
-            }
-        });
-        arrStr = JSON.stringify(newdeps);
-        return `define(${arrStr}`;
-    },
-    renderWithProp: function (html, props){
-        var bdc = this;
-        html = html.replace(/{{(.*?)}}/g, function(all, m1){
-            return evalWithProp(m1);
-        });
-        function evalWithProp(model){
-            if(!/props\./.test(model)){
-                return `{{${model}}}`;
-            }
-            return $$.expr(model, props);
-        }
-        return html;
-    },
-    collectJs: async function (html){
-        var bdc = this;
-        var reg = new RegExp(`<script([^\\*\\[\\(\\+]*?)>\\n*([\\s\\S]*?)\\s*</script>|${firstCollector}`, 'ig');
-        var result;
-        while ((result = reg.exec(html))){
-            var attr = result[1];
-            var script = result[2];
-            var match = result[0];
-            if(match == firstCollector){
-                state.commonCode = "commonJS";
-                bdc.codes.first += bdc.codes.js + "\n";
-                bdc.codes.js = '';
-                continue;
-            }
-            if ((!/text\/template/i.test(attr) || / id="/.test(attr))
-                && !/ ne-(?!alias)|\/\/(g|analytics)\.163\.com|wrating\.js/.test(attr)
-                && !/ _keep=\S+?( |\/|$)/.test(attr)
-                && !/document\.write|vjTrack|neteaseTracker/.test(script)) {
-                if (/src=(['"])\s*(\S+?)\s*\1/i.test(attr)) {
-                    var src = RegExp.$2;
-                    var jsurl_root = `${conf.devHost}/${vc.cdnfix}` + global.VCPATH;
-                    if (!/https?:\/\//i.test(src)) {
-                        src = util.fulldir(src, jsurl_root);
-                        if(!/https?:\/\//.test(src)){
-                            continue;
-                        }
-                    }
-                    //print "收集js: $src\n";
-                    if (!bdc.defined[`!${src}`]) {
-                        if(!/ _drop(=| |$)/.test(attr)){
-                            var charset = '';
-                            if (/charset\s*=\s*(['"]?)(gbk|gb2312)\1/i.test(attr)) {
-                                charset = '@gbk';
-                            }
-                            if (headScriptMap[src]) {
-                                bdc.codes.headScript += `<script src="${src}"></script>\n`;
-                                bdc.defined[`!${src}`] = 1;
-                            } else {
-                                await bdc.addJs(src+charset);
-                                attr = attr.replace(/src=(['"])\s*(\S+?)\s*\1/i, `src="${src}"`)
-                                    .replace(/charset\s*=\s*(['"])\S+\1/i, '');
-                                bdc.codes.js += `<script${attr} charset="utf-8"></script>\n`;
-                            }
-                        }
-                    }
-                } else {
-                    if(!/ _drop(=| |$)/.test(attr)){  //不收集标记_drop的片断
-                        if(/type=/.test(attr) && !/text\/javascript/i.test(attr)){
-                            bdc.codes[state.commonCode] += `<script${attr}>\n${script}\n</script>\n`;
-                        }else{
-                            bdc.codes.js += `${script};\n`;
-                        }
-                    }
-                    bdc.codes.js += `<script${attr}>\n${script}\n</script>\n`;
-                }
-            }
-        }
-    },
-    collectCss: async function (html){
-        var bdc = this;
-        var file2cssid = {}; //用于css文件去重
-        var reg = /(<link\s[^\*\[\(\+]*?>|<style[^\*\[\(\+]*?>[\s\S]*?<\/style>)/ig;
-        var result;
-        while((result = reg.exec(html))){
-            var tmp = result[1];
-            if(/<link(\s[\s\S]*?)>/i.test(tmp)){
-                var attr = RegExp.$1;
-                var cssurlRoot = `${conf.devHost}/${vc.cdnfix}`+global.VCPATH;
-                if(!/['"]stylesheet/i.test(attr)){
-                    if (/href=(['"])\s*(\S+?)\s*\1/i.test(attr)) {
-                        var src = RegExp.$2;
-                        if (!/(https?:)\/\//i.test(src)) {
-                            src = util.fulldir(src, cssurlRoot);
-                            if (!/https?:\/\//.test(src)) {
-                                continue;
-                            }
-                        }
-                        attr = attr.replace(/href=(['"])\s*(\S+?)\s*\1/i, `href="${src}"`);
-                    }
-                    bdc.codes.commonLink += `<link${attr}>`;
-                    continue;
-                }
-                if (!/ ne-/.test(attr) && !/ _keep=\S+?( |\/|$)/.test(attr)) {
-                    if (/href=(['"])\s*(\S+?)\s*\1/.test(attr)) {
-                        var src = RegExp.$2;
-                        if (!/(https?:)\/\//i.test(src)) {
-                            src = util.fulldir(src, cssurlRoot);
-                        }
-                        var oldid = file2cssid[src];
-                        util.stack(`出错文件: ${src}`);
-                        if (oldid) { //去重
-                            bdc.css.push(bdc.css[oldid]);
-                            bdc.css[oldid] = '';
-                        } else {
-                            attr = attr.replace(/href=(['"])\s*(\S+?)\s*\1/, `href="${src}"`);
-                            bdc.css.push(`<link${attr}>`);
-                        }
-                        util.stack([]);
-                        file2cssid[src] = bdc.css.length;
-                    }
-                }
-            } else if (/<style([\s\S]*?)>\s*([\s\S]*?)\s*<\/style>/i.test(tmp)) {
-                var attr = RegExp.$1;
-                var style = RegExp.$2;
-                style = style.replace(/url\s*\(\s*(.*?)\s*\)/g, function(all, m1){
-                    return bdc.procss(m1);
-                });
-                if(!/ _keep=\S+?( |\/|$)/.test(attr)){
-                    bdc.css.push(`<style${attr}>\n${style}\n</style>`);
-                }
-            }
-        }
-    },
-    procss: function (src, cssroot){
-        var bdc = this;
-        var quote = "";
-        src = src.replace(/^\s*(['"])(.*?)\s*\1$/, function(all, m1, m2){
-            quote = m1;
-            return m2;
-        }).trim();
-
-        if (!/(https?:)\/\//i.test(src)) {
-            src = util.fulldir(src, cssroot);
-        }
-
-        return `url(${quote}${src}${quote})`;
-    }
-}
-
-
-function LiveCollector(){  //正式阶段收集器
-    this.parentHtmls = {}; //已经收集过的主页面
-    this.defined = {}; //收集过的module js
-    this.predefined = {};  //和defined形成补充，用于避免死循环
-    this.collectedCss = [];
-    this.skins = {};
-    this.css = [];   //具体style，供下一阶段压缩
-    this.codes = {js:'', css:'', commonLink:'', headScript:'', first:'', commonJSFirst:'', commonJS:'', purejs:''};
-}
-LiveCollector.prototype = {
-    init: async function(html, htmlfile, isSub){
-        var bdc = this;
-        bdc.urlRoot = `${conf.devHost}/${vc.cdnfix}` + global.VCPATH;
-        state.commonCode = "commonJSFirst";
-        var reg = new RegExp(`([^<>]*?)\\sne-module\\s*=\\s*(['"])([^'"<]*?)\\2((>|[\\s\\S]*?[^\\%]>)[\\s\\S]*?<[^!])|${firstCollector}`, 'ig');
-        html = await util.replaceAsync(html, reg, async function(all, m1, m2, m3, m4){
-            return await bdc.procModule(m1, m3, m4, all)
-        });
-        if(!isSub){
-            bdc.codes.purejs += bdc.codes.js; //此处缓存为了避免procPlugin时，碰到firstCollector便把所有js均放到codes.first内
-            bdc.codes.js = '';
-        }
-        state.commonCode = "commonJSFirst";
-        html = html.replace(new RegExp(`([^<>]*?)\\sne-plugin\\s*=\\s*(['"])([^'"<]*?)\\2|${firstCollector}`, 'g'), function(all, m1, m2, m3){
-            return bdc.procPlugin(m1, m3, all);
-        });
-        //project.json里指定的打包内容
-        var depends = projectJson.depends[htmlfile];
-        var dependsExclude = projectJson.dependsExclude && projectJson.dependsExclude[htmlfile];
-        if(depends){
-            log(`打包额外的模块: ${depends}\n`);
-            depends = depends.replace(/(^| )\//g, `$1${vc.localhost}/`);
-            var excludes = {};
-            if (dependsExclude) {
-                dependsExclude = dependsExclude.replace(/(^| )\//g, `$1${vc.localhost}/`);
-                util.lsr('.', dependsExclude).forEach(function(file){
-                    excludes[file] = 1;
-                });
-            }
-            await $$.reducePromise(util.lsr('.', depends), async function(file){//额外模块
-                if(!fs.existsSync(file) || excludes[file]){
-                    return;
-                }
-                var moduleid = util.fulldir(file, "/" + vc.cdnfix + vc.path);
-                moduleid = moduleid.replace(vc.localhost, '');
-                if(/\.html$/.test(file)){
-                    log(`Skin: ${file}\n`);
-                    util.stack(`出错文件: ${file}`);
-                    var tmp = readWork(file);
-                    if(/<\/html>\s*$/i.test(tmp)){ //不把完整的demo页面作为皮肤
-                        return;
-                    }
-                    var modulePath = moduleid.replace(/[^/]*$/, '');
-                    var moduleHost = '/';
-                    if(~moduleid.indexOf('//')){
-                        moduleHost = moduleid;
-                        moduleHost = moduleHost.replace(/(\/\/.*?\/).*/, '$1');
-                    }
-                    //fix @ path
-                    tmp = tmp.replace(/((href|ne-module|ne-plugin|ne-extend)=['"])\@\//g, `$1${moduleHost}`);
-                    tmp = tmp.replace(/((href|ne-module|ne-plugin|ne-extend)=['"])\@/g, `$1${modulePath}`);
-                    bdc.skins[moduleid] = bdc.fixSkin(tmp);
-                    moduleid = moduleid.replace(/\.html$/, '.js');
-                    if(!fs.existsSync(`${vc.localhost}${moduleid}`)){
-                        moduleid = moduleid.replace(/\.\w+\.js$/, '.js');
-                    }
-                    util.stack([]);
-                }
-                if(/\/\w+$/.test(moduleid)){
-                    moduleid += ".js";
-                }
-                if(/\.js/.test(moduleid) && fs.existsSync(`${vc.localhost}${moduleid}`)){
-                    await procModule("", moduleid, "");
-                }
-            });
-        }
-        return html;
-    },  
-    fixSkin: async function (tmp){
-        var bdc = this;
-        tmp = await (new DevCollector).init(tmp, '', 1);
-        tmp = tmp.replace(/<link ([\s\S]*?)>/ig, function(all, m1){
-            return bdc.moduleLink(m1);
-        });
-        tmp = tmp.replace(/<img([^>]*?)>/ig, function(all, m1){
-            return util.expandIMGPath(m1);
-        });
-        tmp = tmp.replace(/\t/g, ' ');
-        return tmp;
-    },
-    addCss: function (file){
-        var bdc = this;
-        if(bdc.collectedCss.indexOf(file) != -1){
-            return;
-        }
-        bdc.collectedCss.push(file);
-    },
-    moduleLink: function (attr){
-        var bdc = this;
-        if (/href\s*=\s*(['"])\s*(\S+)\s*\1/.test(attr)){
-            bdc.addCss(RegExp.$2);
-            return "";
-        }
-        return `<link ${attr}>`;
-    },
-    addJs: async function (file, referURL){ //普通js依赖(!*.js)
-        var bdc = this;
-        //为正式版收集js
-        var revert;
-        await $$.reducePromise(file.split(/\s*;\s*/), async function(src){
-            var bowlderSrc = 0;
-            src = util.fulldir(src, referURL);
-            var gbk = 0;
-            src = src.replace(/\@([\w\-]+)$/, function(all, m1){
-                var charset = m1;
-                if (/gb/i.test(charset)) {
-                    gbk = 1;
-                }
-            });
-            if (!bdc.defined["!"+src]) {
-                if (headScriptMap[src]) {
-                    bdc.codes.headScript += `<script src="${src}"></script>\n`;
-                } else if (/\.com\/(common|libs)\//.test(src)) {
-                    bdc.codes[state.commonCode] += `<script src="${src}"></script>\n`;
-                } else if (/\.com\/(modules\/bowlder\-[\d\.]+?\.js([\#\?].*)?)/.test(src)) {
-                    bdc.codes.commonJSFirst += `<script src="${vc.resRoot}/${RegExp.$1}"></script>\n`;
-                } else {
-                    var tmp = await util.fetchUrl(src, gbk);
-                    if(/\/bowlder[\-\d\.]*?\.js$/.test(src)){ //确保bowlder.js放在first收集器
-                        bowlderSrc = 1;
-                        if(bdc.codes.first){
-                            js2first = 'first';
-                            revert = 1;
-                        }
-                    }
-                    bdc.codes[js2first] +=  `${tmp}\n;`;
-                    global.jscount ++;
-                }
-                bdc.defined[`!${src}`] = 1;
-                if(bowlderSrc){
-                    if (state.alias) {
-                        bdc.procModule("", state.alias, "");
-                        bdc.codes[js2first] += `bowlder.run("${state.alias}").then(function(json){bowlder.conf({alias:json})});`;
-                    }
-                }
-                if(revert){
-                    js2first = 'js';
-                }
-            }
-        });
-    },
-    procExtend: function (filestr){ //收集extend中的模块
-        var bdc = this;
-        var files = [];
-        filestr.split(/\s*;\s*/).forEach(function(file){
-            if (!/^\%/.test(file)) {
-                if(!/{{.*?}}/.test(file)){
-                    file = util.fulldir(file, bdc.urlRoot);
-                    bdc.procDefine(file);
-                }
-            }
-            files.push(file);
-        });
-        var fileStr = files.join("\n;");
-        return ` ne-extend="${fileStr}"`;
-    },
-    procText: function (fileURL){ //收集text类型define
-        var bdc = this;
-        if (!bdc.defined[`text!${fileURL}`]) {
-            var text = util.fetchUrl(fileURL)
-                .replace(/\n/g, '\\n')
-                .replace(/"/g, '\\"');
-            var safename = fileURL.replace(/^http:\/\/.*?\//, '/');
-            bdc.codes.js += `bowlder.define("${safename}","${text}");\n`;
-            bdc.defined[`text!${fileURL}`] = 1;
-        }
-    },
-    procDefine: async function (fileURL, avoidLock){ //收集各种define
-        var bdc = this;
-        var jstmp = '';
-        if(/\%/.test(fileURL) || (avoidLock && bdc.predefined[fileURL])){
-            return;
-        }else if(!/reg\.163\.com/.test(fileURL)){  //不打包常用类库或urs库
-            bdc.predefined[fileURL] = 1;
-            if (!bdc.defined[fileURL]) {
-                jstmp = util.fetchUrl[fileURL];
-                if(/^http:\/\/img\d\.cache\.netease\.com/.test(fileURL)){
-                    log(`CDN depend: ${fileURL}\n`);
-                }else if(jstmp){
-                    log(`pack depend: ${fileURL}\n`);
-                    var safename = fileURL.replace(/^http:\/\/.*?\//, '/');
-                    jstmp = jstmp.replace(/\n\s*?\/\/.*/g, '\n')
-                        .replace(/\(\s*?\/\/[^\n]*/g, '(')
-                        .replace(/\(\s*?\/\*.*?\*\//g, '(')
-                        .replace(/(^|[^\w\.])(bowlder\.)?define\s*\(\s*([^\s"'\)])/, `$1bowlder.define("${safename}", $3`);
-                    jstmp = await util.replaceAsync(jstmp, /define\s*\(\s*(\[.*?\])/, async function(all, m1){
-                        return await bdc.parseDeps(m1, fileURL);
-                    });
-                    bdc.codes[js2first] += jstmp+"\n;\n";
-                }
-                bdc.defined[fileURL] = jstmp;
-            } else {
-                jstmp = bdc.defined[fileURL];
-            }
-        }
-        return jstmp;
-    },
-    procPlugin: function (pre, basenames, match){
-        var bdc = this;
-        if(match == firstCollector){
-            state.commonCode = "commonJS";
-            bdc.codes.first += bdc.codes.js;
-            bdc.codes.js = '';
-            return match;
-        }
-        log(`Plugin: ${basenames}\n`);
-        var filearr = [];
-        basenames.split(/\s*;\s*/).forEach(function(basename){
-            var file = util.fulldir(basename, bdc.urlRoot);
-            bdc.procDefine(file);
-            if(file){
-                filearr.push(file);
-            }
-        });
-        var filenames = filearr.join(";");
-        if(filenames){
-            var pluginAttr = `ne-plugin="${filenames}"`;
-            return pre+' '+pluginAttr;
-        }else{
-            return pre;
-        }
-    },
-    procModule: async function (pre, basename, content, match){
-        var bdc = this;
-        if(match == firstCollector){
-            state.commonCode = "commonJS";
-            bdc.codes.first += bdc.codes.js;
-            bdc.codes.js = '';
-            return match;
-        }
-        log(`Module: ${basename}\n`);
-        var file =  util.fulldir(basename, bdc.urlRoot);
-        if(/\/\w+$/.test(file)){
-            file += ".js";
-        }
-        var format = path.extname(file);
-        var jstmp = '';
-        if (format == '.js') {
-            jstmp = bdc.procDefine(file);
-        }
-        var htmltmp = '';
-        if (/<\/$/.test(content) && />\s*</.test(content) && !/>\s*<!--#include\s+(file|virtual)/.test(content)) { //需要填充模块html
-            if (!/\.html\s*=/.test(jstmp)) {                //js内无html定义
-                var props = parseProp(pre+content);
-                var htmlfile = file;
-                if(props.skin && props.skin.substr(0,1)=='/'){
-                    htmlfile = props.skin;
-                }else{
-                    var postfix = props.skin ? `.${props.skin}.html` : '.html';
-                    htmlfile = htmlfile.replace(/\.js$/, postfix);
-                }
-                if(!bdc.parentHtmls[htmlfile]){
-                    //htmlfile:
-                    //http://127.0.0.1:8990/tie/yun/sitegov/modules/header/header.html
-                    bdc.parentHtmls[htmlfile] = 1;
-                    htmltmp = await fetchCollectHtml(htmlfile);
-                    htmltmp = htmltmp.replace(/<meta\s+name\s*=\s*"cms_id".*?>\s*/ig, '');
-                    htmltmp = htmltmp.replace(/<link ([\s\S]*?)>/g, function(all, m1){
-                        return bdc.moduleLink(m1);
-                    });
-                    htmltmp = await (new DevCollector).init(htmltmp, '', 1);
-                    htmltmp = bdc.renderWithProp(htmltmp, props);
-                    await bdc.collectJs(htmltmp);
-                    content = content.replace(/>\s*</, `>${htmltmp}<`);
-                    delete bdc.parentHtmls[htmlfile];
-                }
-            }
-        }
-
-        var moduleAttr = 'ne-module=""'; //html文件的ne-module值置空
-        if(format != 'html') {
-            var safename = file;
-            moduleAttr = `ne-module="${safename}"`;
-        }
-        pre = pre.replace(/\s*ne-props=(['"]).*?\1/, '');
-        content = content.replace(/\s*ne-props=(['"]).*?\1/, '');
-
-        var result = `${pre} ${moduleAttr}${content}`;
-        result = result.replace(/^([^>]*?)\s+ne-extend\s*=\s*(['"])\s*(\S+?)\s*\2/, function(all, m1, m2, m3){
-            return m1+bdc.procExtend(m3);
-        });
-        return result;
-    },
-    parseDeps: async function (arrStr, referURL){         //js define中的依赖
-        var bdc = this;
-        arrStr = arrStr.replace(/^\[\s*,\s*/, '[');
-        var deps = JSON.parse(arrStr);
-        var newdeps = [];
-        await $$.reducePromise(deps, async function(file){
-            util.stack(`来源文件: ${referURL}`);
-            log(`depends: ${file}, ${referURL}\n`);
-            if (/\.css/.test(file)) {
-                file = util.fulldir(file, referURL);
-                bdc.addCss(file);
-            } else if (file.substr(0,1)=='!') { //不符amd规范的js
-                file = file.substr(1);
-                await bdc.addJs(file, referURL);
-            } else {    //递归收集，期望别死循环..
-                var cdnDefine = cdnDefine(file);
-                if(cdnDefine){
-                    newdeps.push(cdnDefine);
-                }else{
-                    newdeps.push(file);
-                    if (!/\%/.test(file) && file != 'exports' && file != 'require') {
-                        file = file.replace(/(.*?)\!/, ''); //去掉plugin!前缀
-                        var depType = RegExp.$1;
-                        file = util.fulldir(file, referURL);
-                        if (depType == 'text') {
-                            bdc.procText(file);
-                        } else {
-                            if(/\/\w+$/.test(file)){
-                                file += ".js";
-                            }
-                            bdc.procDefine(file, 1);
-                        }
-                    }
-                }
-                util.stack([]);
-            }
-        });
-        arrStr = JSON.stringify(newdeps);
-        return `define(${arrStr}`;
-    },
-    renderWithProp: function (html, props){
-        var bdc = this;
-        html = html.replace(/{{(.*?)}}/g, function(all, m1){
-            return evalWithProp(m1);
-        });
-        function evalWithProp(model){
-            if(!/props\./.test(model)){
-                return `{{${model}}}`;
-            }
-            return $$.expr(model, props);
-        }
-        return html;
-    },
-    collectJs: async function (html){
-        var bdc = this;
-        var reg = new RegExp(`<script([^\\*\\[\\(\\+]*?)>\\n*([\\s\\S]*?)\\s*</script>|${firstCollector}`, 'ig');
-        var result;
-        while ((result = reg.exec(html))){
-            var attr = result[1];
-            var script = result[2];
-            var match = result[0];
-            if(match == firstCollector){
-                state.commonCode = "commonJS";
-                bdc.codes.first += bdc.codes.js;
-                bdc.codes.js = '';
-                continue;
-            }
-            if ((!/text\/template/i.test(attr) || / id="/.test(attr))
-                && !/ ne-(?!alias)|\/\/(g|analytics)\.163\.com|wrating\.js/.test(attr)
-                && !/ _keep=\S+?( |\/|$)/.test(attr)
-                && !/document\.write|vjTrack|neteaseTracker/.test(script)) {
-                if (/src=(['"])\s*(\S+?)\s*\1/i.test(attr)) {
-                    var src = RegExp.$2;
-                    var jsurl_root = `${conf.devHost}/${vc.cdnfix}` + global.VCPATH;
-                    if (!/https?:\/\//i.test(src)) {
-                        src = util.fulldir(src, jsurl_root);
-                        if(!/https?:\/\//.test(src)){
-                            continue;
-                        }
-                    }
-                    //print "收集js: $src\n";
-                    if (!bdc.defined[`!${src}`]) {
-                        if(!/ _drop(=| |$)/.test(attr)){
-                            var charset = '';
-                            if (/charset\s*=\s*(['"]?)(gbk|gb2312)\1/i.test(attr)) {
-                                charset = '@gbk';
-                            }
-                            if (headScriptMap[src]) {
-                                bdc.codes.headScript += `<script src="${src}"></script>\n`;
-                                bdc.defined[`!${src}`] = 1;
-                            } else {
-                                await bdc.addJs(src+charset);
-                                attr = attr.replace(/src=(['"])\s*(\S+?)\s*\1/i, `src="${src}"`)
-                                    .replace(/charset\s*=\s*(['"])\S+\1/i, '');
-                            }
-                        }
-                    }
-                } else {
-                    if(!/ _drop(=| |$)/.test(attr)){  //不收集标记_drop的片断
-                        if(/type=/.test(attr) && !/text\/javascript/i.test(attr)){
-                            bdc.codes[state.commonCode] += `<script${attr}>\n${script}\n</script>\n`;
-                        }else{
-                            bdc.codes.js += `${script};\n`;
-                        }
-                    }
-                }
-            }
-        }
-    },
-    collectCss: async function (html){
-        var bdc = this;
-        var file2cssid = {}; //用于css文件去重
-        var reg = /(<link\s[^\*\[\(\+]*?>|<style[^\*\[\(\+]*?>[\s\S]*?<\/style>)/ig;
-        var result;
-        while((result = reg.exec(html))){
-            var tmp = result[1];
-            if(/<link(\s[\s\S]*?)>/i.test(tmp)){
-                var attr = RegExp.$1;
-                var cssurlRoot = `${conf.devHost}/${vc.cdnfix}`+global.VCPATH;
-                if(!/['"]stylesheet/i.test(attr)){
-                    if (/href=(['"])\s*(\S+?)\s*\1/i.test(attr)) {
-                        var src = RegExp.$2;
-                        if (!/(https?:)\/\//i.test(src)) {
-                            src = util.fulldir(src, cssurlRoot);
-                            if (!/https?:\/\//.test(src)) {
-                                continue;
-                            }
-                        }
-                        attr = attr.replace(/href=(['"])\s*(\S+?)\s*\1/i, `href="${src}"`);
-                    }
-                    bdc.codes.commonLink += `<link${attr}>`;
-                    continue;
-                }
-                if (!/ ne-/.test(attr) && !/ _keep=\S+?( |\/|$)/.test(attr)) {
-                    if (/href=(['"])\s*(\S+?)\s*\1/.test(attr)) {
-                        var src = RegExp.$2;
-                        if (!/(https?:)\/\//i.test(src)) {
-                            src = util.fulldir(src, cssurlRoot);
-                        }
-                        var oldid = file2cssid[src];
-                        util.stack(`出错文件: ${src}`);
-                        if (oldid) { //去重
-                            bdc.css.push(bdc.css[oldid]);
-                            bdc.css[oldid] = '';
-                        } else {
-                            if(!/ _drop(=| |$)/.test(attr)){
-                                global.csscount ++;
-                                var tmpCss = await getCssFile(src);
-                                bdc.css.push(tmpCss);
-                            }
-                            attr = attr.replace(/href=(['"])\s*(\S+?)\s*\1/, `href="${src}"`);
-                            bdc.css.push(`<link${attr}>`);
-                        }
-                        util.stack([]);
-                        file2cssid[src] = bdc.css.length;
-                    }
-                }
-            } else if (/<style([\s\S]*?)>\s*([\s\S]*?)\s*<\/style>/i.test(tmp)) {
-                var attr = RegExp.$1;
-                var style = RegExp.$2;
-                style = style.replace(/url\s*\(\s*(.*?)\s*\)/g, function(all, m1){
-                    return bdc.procss(m1);
-                });
-                if(!/ _keep=\S+?( |\/|$)/.test(attr)){
-                    bdc.css.push(`<style${attr}>\n${style}\n</style>`);
-                }
-            }
-        }
-    },
-    procss: function (src, cssroot){
-        var bdc = this;
-        var quote = "";
-        src = src.replace(/^\s*(['"])(.*?)\s*\1$/, function(all, m1, m2){
-            quote = m1;
-            return m2;
-        }).trim();
-
-        if (!/(https?:)\/\//i.test(src)) {
-            src = util.fulldir(src, cssroot);
-        }
-
-        return `url(${quote}${src}${quote})`;
-    }
-}
-
-function procComment(tmp){
-    if(/<(link|style|script)/i.test(tmp)){
-        if(/\[endif\]/.test(tmp)){
-            var cursor = collectComments;
-            collectComments.push(tmp);
-            return `<!--\$collectComments[${cursor}]-->`;
-        }
-        return '';
-    }
-    return tmp;
-}
+var DevCollector = require('./_bdc_dev');
+var LiveCollector = require('./_bdc_live');
 
 exports.dev = async function(htmlDir){
     bdDir.inc = util.getFolder(`${htmlDir}/inc`);
     var vcpath = global.VCPATH;
-    function parseAlias(quote, alias){
-        state.alias = util.fulldir(alias, `/${vc.cdnfix}${vc.path}`);
-        state.bowlderAlias = util.parseJson(`${vc.localhost}/${state.alias}`);
-        log(`Alias: ${state.alias}\n`);
-        return `ne-alias=${quote}${conf.devHost}${state.alias}${quote}`;
-    }
-
     //将packModuleDir中的js所需依赖全部收集，与html共同发布(便于动态加载)
     //sports/rio_data_live
     var dirs = projectJson.packModuleDir || '';
@@ -988,7 +92,7 @@ exports.dev = async function(htmlDir){
                 var bdc = new DevCollector();
                 await bdc.init('', file);
                 await $$.reducePromise(bdc.collectedCss, async function(cssFile){
-                    bdc.codes.css += await getCssFile(util.fulldir(cssFile, vc.devpath));
+                    bdc.codes.css += await util.procCssAndExpand(util.fulldir(cssFile, vc.devpath));
                 });
                 bdc.codes.css = bdc.codes.css.trim();
                 if (bdc.codes.css) {
@@ -1009,28 +113,16 @@ exports.dev = async function(htmlDir){
     });
     await $$.reducePromise(collectFiles(htmlDir), async function(file){
         var reqCollector = {"head": 1, "foot": 1};
-        collectComments = [];
-        state = {commonCode: "commonJSFirst"};
         global.jscount = global.csscount = 0;
         //stripe /var/fepack/dist/tie_yun_sitegov/html4dev
-        var vm = file.replace(util.distDir+'/', '').replace(/^[^\/]*/, ''); 
-        var url = vc.devpath + vm; //http://127.0.0.1:8990/tie/yun/sitegov/info.html
+        var vm = file.replace(util.distDir+'/', '').replace(/^[^\/]*/, ''); //相对项目根目录的路径
+        var url = vc.devpath + vm; //"http://127.0.0.1:8990/tie/yun/sitegov" + "/info.html"
         log(`\n开始收集 ${file}: `, 2, 1);
         var html = await fetchCollectHtml(file);
         // 未收集的html源码
         if (html) {
             var bdc = new DevCollector();
             bdc.parentHtmls[url] = 1;
-            html = html.replace(/ne-alias=(['"])(\S+?)\1/g, function(all, m1, m2){
-                return parseAlias(m1,m2);
-            });
-            if(!state.bowlderAlias){
-                if(/\/common2015\/\w+nav/.test(html)){
-                    state.bowlderAlias = util.parseJson(`${vc.localhost}/include/2015/alias.js`);
-                }else{
-                    state.bowlderAlias = {};
-                }
-            }
             var hasBowlder = 0;
             log(`获取 ${file} 成功。\n`);
             if (/:\/\/.*?\/(z\/)?(\S+)\//.test(url)) {
@@ -1039,9 +131,6 @@ exports.dev = async function(htmlDir){
             if (!/<!--!include\s+collector=(['"])head\1/.test(html)) {
                 html = html.replace(/((<script.*?>\s*)*(<\/head>|<body))/i, '<!--!include collector="head"-->\n$1');
             }
-            html = html.replace(/<!--[^#\!][\s\S]*?-->/g, function(all){
-                return procComment(all);
-            });
             if (/<script\s.*?bowlder[\-\d\.]*?\.js/i.test(html)) {
                 hasBowlder = 1;
             }
@@ -1053,7 +142,6 @@ exports.dev = async function(htmlDir){
             });
 
             log("收集普通js ...\n");
-            state.commonCode = "commonJSFirst";
             await bdc.collectJs(html);
             bdc.codes.purejs = bdc.codes.js;
             bdc.codes.js = '';
@@ -1092,7 +180,7 @@ exports.dev = async function(htmlDir){
                 global.exitERR(`无法创建 ${liveIncFootFile} 所在目录。`);
             }
 
-            html = util.uniformStaticAddr(clearCollectTags(html));
+            html = util.uniformStaticAddr(clearCollectTags(html, bdc));
 
             if(bdc.codes.first){
                 html = html.replace(/<!--!include collector="(first)"-->/i, function(all, m1){
@@ -1149,19 +237,6 @@ exports.dev = async function(htmlDir){
             //process.exit(1);
         }
     });
-}
-
-async function fetchCollectHtml(file){
-    log(`生成收集用的html(${file}) ..\n`);
-    var html = await util.fetchUrl(file);
-    var abspath = path.dirname(file.replace(conf.devHost, vc.localhost));
-    var modulePath = (abspath + '/').replace(vc.localhost, '').replace(util.distHtmlDir +'/', `/${vc.cdnfix}${vc.path}/`);
-    //fix @ path
-    html = html.replace(/((href|ne-module|ne-plugin|ne-extend)=['"])\@/g, '$1'+modulePath)
-        .replace(/<!--#include\s+(file|virtual)=(['"])(.*?)\2\s*-->/ig, function(all, m1, m2, m3){
-            return fetchSSI(m3, abspath, m1);
-        });
-    return html;
 }
 
 function fetchSSI(ssi, abspath, ssikey){
@@ -1234,16 +309,6 @@ function inlineSSI(file){  //输出内联ssi
     return content;
 }
 
-async function getCssFile(src){
-    util.stack("出错文件: "+src);
-    var [,,, tmp] = await util.procSingleCss(src);
-    var cssDir = path.dirname(src);
-    //将css内的相对url转成绝对地址
-    tmp = tmp.replace(/\burl\s*\(\s*['"]?(\S+?)['"]?\s*\)/g, (all, m1) => util.cdnImgPath(m1, null, cssDir));
-    util.stack([]);
-    return tmp;
-}
-
 function getCollectFileName(tmp, collector){
     var [, dir, file] = /(.*\/)?(.*)/.exec(tmp);
     file = `${collector}~${file}`;
@@ -1251,19 +316,6 @@ function getCollectFileName(tmp, collector){
         file = projectJson.collectors[file];
     }
     return (dir || '') + file;
-}
-
-function parseProp(tag){
-    var props = {};
-    tag = tag.replace(/<\%.*?\%>/g, '');
-    if(/^[^>]*?ne-props\s*=\s*(['"])([\s\S]*?)\1/.test(tag)){
-        var tmp = RegExp.$2, result;
-        var tester = /([^;\s]+?)\s*[\:\=]\s*([^;\s]*)/g;
-        while((result = tester.exec(tmp))){
-            props[result[1]] = result[2];
-        }
-    }
-    return props;
 }
 
 function isCmsPage(file){ //本项目普通SSI是否有对应cms片断
@@ -1285,7 +337,7 @@ function getCmspath(file){
     return queryCmsPath(channel, util.findProject(file));
 }
 
-function clearCollectTags(html){           //必须在替换cdn路径之前使用
+function clearCollectTags(html, bdc){           //必须在替换cdn路径之前使用
     html = html.replace(/(\s*)(<script[^\*\[\(\+]*?>)([\s\S]*?<\/script>)/ig, function(all, m1, m2, m3){
         return clearCollectTag(m1, m2, m3);
     })
@@ -1295,7 +347,7 @@ function clearCollectTags(html){           //必须在替换cdn路径之前使�
     .replace(/(\s*)(<link\s[^\*\[\(\+]*?>)/ig, function(all, m1, m2){
         return clearCollectTag(m1, m2);
     });
-    collectComments.forEach(function(tmp){
+    bdc.collectComments.forEach(function(tmp){
         html = html.replace(/<!--\$collectComments\[\d+\]-->/, tmp);
     });
     return html;
@@ -1336,13 +388,6 @@ exports.live = async function(htmlDir){
         jscss: util.readFromLog(logfiles.collectres, logfmts.collectres)
     };
     
-    function parseAlias(quote, alias){
-        state.alias = util.fulldir(alias, `/${vc.cdnfix}${vc.path}`);
-        state.bowlderAlias = util.parseJson(`${vc.localhost}/${state.alias}`);
-        log(`Alias: ${state.alias}\n`);
-        return `ne-alias=${quote}${conf.devHost}${state.alias}${quote}`;
-    }
-    
     //将packModuleDir中的js所需依赖全部收集，与html共同发布(便于动态加载)
     //sports/rio_data_live
     var dirs = projectJson.packModuleDir || '';
@@ -1355,7 +400,7 @@ exports.live = async function(htmlDir){
                 var bdc = new LiveCollector();
                 await bdc.init('', file);
                 await $$.reducePromise(bdc.collectedCss, async function(cssFile){
-                    bdc.codes.css += await getCssFile(util.fulldir(cssFile, vc.devpath));
+                    bdc.codes.css += await util.procCssAndExpand(util.fulldir(cssFile, vc.devpath));
                 });
                 bdc.codes.css = bdc.codes.css.trim();
                 if (bdc.codes.css) {
@@ -1376,8 +421,6 @@ exports.live = async function(htmlDir){
     });
     await $$.reducePromise(collectFiles(htmlDir), async function(file){
         var reqCollector = {"head": 1, "foot": 1};
-        collectComments = [];
-        state = {commonCode: "commonJSFirst"};
         global.jscount = global.csscount = 0;
         //stripe /var/fepack/dist/tie_yun_sitegov/html
         var vm = file.replace(util.distDir+'/', '').replace(/^[^\/]*/, ''); 
@@ -1388,16 +431,6 @@ exports.live = async function(htmlDir){
         if (html) {
             var bdc = new LiveCollector();
             bdc.parentHtmls[url] = 1;
-            html = html.replace(/ne-alias=(['"])(\S+?)\1/g, function(all, m1, m2){
-                return parseAlias(m1,m2);
-            });
-            if(!state.bowlderAlias){
-                if(/\/common2015\/\w+nav/.test(html)){
-                    state.bowlderAlias = util.parseJson(`${vc.localhost}/include/2015/alias.js`);
-                }else{
-                    state.bowlderAlias = {};
-                }
-            }
             var hasBowlder = 0;
             log(`获取 ${file} 成功。\n`);
             if (/:\/\/.*?\/(z\/)?(\S+)\//.test(url)) {
@@ -1406,9 +439,6 @@ exports.live = async function(htmlDir){
             if (!/<!--!include\s+collector=(['"])head\1/.test(html)) {
                 html = html.replace(/((<script.*?>\s*)*(<\/head>|<body))/i, '<!--!include collector="head"-->\n$1');
             }
-            html = html.replace(/<!--[^#\!][\s\S]*?-->/g, function(all){
-                return procComment(all);
-            });
             if (/<script\s.*?bowlder[\-\d\.]*?\.js/i.test(html)) {
                 hasBowlder = 1;
             }
@@ -1420,7 +450,7 @@ exports.live = async function(htmlDir){
             });
 
             log("收集普通js ...\n");
-            state.commonCode = "commonJSFirst";
+            bdc.commonCode = "commonJSFirst";
             await bdc.collectJs(html);
             bdc.codes.purejs = bdc.codes.js;
             bdc.codes.js = '';
@@ -1486,7 +516,7 @@ exports.live = async function(htmlDir){
                 writeTmp(liveCssFile, bdc.codes.css);
             }
 
-            html = util.uniformStaticAddr(clearCollectTags(html));
+            html = util.uniformStaticAddr(clearCollectTags(html, bdc));
 
             //正式环境: inc/first~name.html
             if(bdc.codes.first){
@@ -1575,7 +605,7 @@ exports.live = async function(htmlDir){
 
             var htmlFile = path.resolve(htmlDir, file);
             util.checkFolder(htmlFile);
-            writeTmp(htmlFile, cleanColPath(html)); //正式环境
+            writeTmp(htmlFile, bdc.postCollect(html)); //正式环境
             log(`收集结束: ${htmlFile}\n`);
             global.VCPATH = vcpath;
         }
@@ -1592,25 +622,13 @@ exports.live = async function(htmlDir){
 
     //压缩、上传
     //collect/* => static/*
-
-    //在html中替换cdn地址
-
-    function cleanHttpPath(str){
-        str = str.replace(/(^|;)http:\/\/.*?\//g, '$1/');
-        for(var key in state.bowlderAlias){
-            if(state.bowlderAlias[key] == str){
-                str = key;
-                break;
-            }
+    util.lsr(bdDir.res).forEach(function(file){
+        var fmt = path.extname(file);
+        var outfile = file.replace('/collect/', '/static/collect/');
+        if(fmt == '.js'){
+            util.compressJs(file, outfile);
+        }else if(fmt == '.css'){
+            util.compressCss(file, outfile);
         }
-        return str;
-    }
-
-    function cleanColPath(html){
-        html = html.replace(/(ne-(extend|module|plugin)=")(.*?)"/g, function(all, m1, m2, m3){
-            return m1+cleanHttpPath(m3)+'"';
-        });
-        html = html.replace(/\s+ne-alias=(['"]).*?\1/g, '');
-        return html;
-    }
+    });
 }
