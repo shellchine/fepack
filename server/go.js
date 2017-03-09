@@ -140,7 +140,8 @@ module.exports = function(app){
                 await stmts.addProject.run(project, vcpath, user, user, type);
                 res.jsonp({
                     status: "success",
-                    msg: "添加项目成功"
+                    msg: "添加项目成功",
+                    name:project
                 });
             }catch(e){
                 res.jsonp({
