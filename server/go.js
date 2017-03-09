@@ -135,6 +135,7 @@ module.exports = function(app){
                 }else{
                     postConf["go_config[content]"] = xml.replace(/(?=\s*<\/pipelines>)/, "\n"+pipelineXml);
                 }
+                console.log(postConf);
                 await post(`${host}/go/admin/config_xml`, postConf);
                 await stmts.delProject.run(project);
                 await stmts.addProject.run(project, vcpath, user, user, type);
@@ -228,6 +229,7 @@ module.exports = function(app){
 function post(url, data){
     return new Promise((resolve, reject) => {
         request.post(url, {form: data}, function(err, res, body){
+            console.log('post:',url,res,body);
             if(err){
                 reject(err);
             }else{
