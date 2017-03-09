@@ -4,5 +4,11 @@ module.exports = {
     devHost: "http://dev.f2e.163.com",
     cacheDir: "/var/fepack",
     vcDir: "/var/frontend",
-    authFile: ".goauth"
+    authFile: ".goauth",
+    vc: {
+        type: "svn",
+        host: "https://svn.ws.netease.com/frontend",
+        localhost: "/var/frontend"
+    }
+
 }

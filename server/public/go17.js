@@ -305,7 +305,7 @@
                 var dir = input.value.trim().replace(/\\/g, '/').replace(/^\/?(frontend)?\/?/, '');
                 var _dest = scope.groups[i].dir2dest[dir.replace(/\/.*/,'')]; //根据仓库目录自动设定发布目标
                 if(_dest){
-                    $(input).next("select").val(_dest);
+                    $(input).next("select").val(_dest).change();
                 }
             };
             
