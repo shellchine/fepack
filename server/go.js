@@ -133,7 +133,7 @@ module.exports = function(app){
                         "status":"failed"
                     });
                 }else{
-                    postConf["go_config[content]"] = xml.replace(/(?:\s*<\/pipelines>)/, "\n"+pipelineXml);
+                    postConf["go_config[content]"] = xml.replace(/(?=\s*<\/pipelines>)/, "\n"+pipelineXml);
                 }
                 await post(`${host}/go/admin/config_xml`, postConf);
                 await stmts.delProject.run(project);
