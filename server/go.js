@@ -47,14 +47,14 @@ module.exports = function(app){
     app.get('/go/list', function(req, res) { //获取概览信息
         (async function(){
             var pipelines = {};
-            $$.each(await stmts.pipelines.all(), item=>{
+            $$.each(await stmts.pipelines.all(), item=>{    //select * from pipelines //name, vcpath, manager, creator, gid
                 pipelines[item.name] = {
                     group: item.gid,
                     manager: item.manager
                 }
             });
             var admins = {};
-            $$.each(await stmts.admins.all(), item=>{
+            $$.each(await stmts.admins.all(), item=>{       //select * from users where role='1' //name, fullname, role
                 admins[item.name] = 1;
             });
             
@@ -93,7 +93,7 @@ module.exports = function(app){
         var type = req.params.type;
         var user = req.body.user;
         var vcpath = req.body.vcpath;
-        var dest = req.body.dest;
+        var dest = req.body.dest;       //public/goconf.js 里的group.list里的key
         var authFile = path.resolve(__dirname, conf.authFile);
         if(!fs.existsSync(authFile)){
             res.jsonp({
@@ -111,7 +111,7 @@ module.exports = function(app){
             });
             return;
         }
-        var project = vcpath.replace(/\//g, '_');
+        var project = vcpath.replace(/\//g, '_');   //svn路径替换: / => _
         var pipelineXml = $$.template.replace(fs.readFileSync(pipelineFile).toString(), {
             name: project,
             vcpath: vcpath,
@@ -210,7 +210,7 @@ module.exports = function(app){
         }
     });
     
-    app.post('/go/addpartner/:project', function(req, res) { //添加项目开发者
+    app.post('/go/addpartner/:project', function(req, res) { //添加项目开发者  追加manage,逗号分隔
         var project = req.params.project;
         var user = req.body.newpartner;
         (async function(){
@@ -229,7 +229,7 @@ module.exports = function(app){
 function post(url, data){
     return new Promise((resolve, reject) => {
         request.post(url, {form: data}, function(err, res, body){
-            console.log('post:',url,res,body);
+            console.log('post:',url,'error:',!!err);
             if(err){
                 reject(err);
             }else{

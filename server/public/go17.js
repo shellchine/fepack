@@ -24,7 +24,7 @@
     var host = location.origin.replace(/:\d+|$/, ":8990");
     $("head").append(`<link type="text/css" rel="stylesheet" href="${host}/gohtml/go17.css" />`);
 
-    var stagePath, pipename, pageType = (function(){ //当前页面类型: index/overview/history
+    var stagePath, pipename, pageType = (function(){ //当前页面类型: index/overview/history/admin
         var url = location.href;
         if(/\/go\/pipelines\/(.*)/i.test(url)){
             stagePath = RegExp.$1;
@@ -42,10 +42,13 @@
         yield $.getScript(host + "/gohtml/utils.js");
         yield $.getScript(host + "/gohtml/goconf.js");
         var scope = window.goConf;
+        //格式化scope.groups:
+        //      添加dir2dest:{dest:key},
+        //      规范化list:[{label,value}],用于填充select options
         scope.groups.forEach(group => {
             group.dir2dest = {};
             var list = [];
-            $.each(group.list, function(key, info){
+            $.each(group.list, function(key, info){  //group: { type,name,label,list }  list:{ key:label,dest }
                 var arr = info.split(/,/);
                 for(var i = 1; i < arr.length; i ++){
                     group.dir2dest[arr[i]] = key;
@@ -98,13 +101,16 @@
         }
 
         function initAddUser(){ //首页页: 添加用户
-            var $addUser = $(`<li class="change-pwd">
-                <a go-click="showAddUser()">添加用户</a>
-                <form class="go-change-pwd-form">
-                <div><label>ID：</label><input /></div>
-                <div><label>姓名：</label><input /></div>
-                <a class="submit" go-click="addUser()">提交</a>
-                <div class="status" go-html="msg.addUser" go-class="addSuccess?'success':''"></div></form></li>`).compile(scope);
+            var $addUser = $(`
+                <li class="change-pwd">
+                    <a go-click="showAddUser()">添加用户</a>
+                    <form class="go-change-pwd-form">
+                        <div><label>ID：</label><input /></div>
+                        <div><label>姓名：</label><input /></div>
+                        <a class="submit" go-click="addUser()">提交</a>
+                        <div class="status" go-html="msg.addUser" go-class="addSuccess?'success':''"></div>
+                    </form>
+                </li>`).compile(scope);
             $addUser.click(function(){return false}).prependTo($("#header .user"));
             var $inputs = $addUser.find("input");
             $("body").click(function(e){
@@ -231,11 +237,12 @@
         function getInfo(cb){
             $.async(function*(){
                 var json = yield $.getJSON(host + "/go/list");
+                // {pipelines,admins}   pipelines: { name:{group,manage} } admins:{name:1}
                 $.extend(scope, json);
                 if(json.admins[user]) {
                     //显示管理入口
-                    $("#cruise-header-tab-admin").show();
-                    $("div.pipelines_selector").show();
+                    $("#cruise-header-tab-admin").show();   //header "admin" tab
+                    $("div.pipelines_selector").show();     //indexPage: 右上角搜索
                 }
                 cb();
             });
@@ -261,11 +268,13 @@
         function initGroups(){ //首页项目分组
             var $groups, $content = $("#pipeline_groups_container").hide();
             if($content.length == 0) return;
-            getInfo(function(){
+            getInfo(function(){ //extend scope: pipelines,admins
                 scope.admins[user] && initAddUser();
                 var pipelines = scope.pipelines;
                 var divHtmls = scope.divHtmls = {};
+                //init: divHtmls: { groupId:html }
                 $content.find(".pipeline").each(function(){
+                    //如果当前user是管理员，或者是 该pipeline的manage，则添加至:divHtmls[groupId]=html;
                     var $pipeline = $(this);
                     var pipeId = $pipeline.attr("id").replace(/^pipeline_/, '').replace(/_panel/, '');
                     var item = pipelines[pipeId] || {group:'common', manager:'f2e'};
@@ -278,7 +287,13 @@
                         divHtmls[groupId] += $pipeline[0].outerHTML + '<div class="divider"></div>';
                     }
                 });
-                
+
+                //group.show 显示新建项目详情
+                //group.vcpath 代码路径
+                //group.dest  select的选中项    //group.list的key
+                //group.list    select options
+                //scope.createProject(i)    新增按钮click
+                //group.msg     innerHtml,显示loading
                 $groups = $($.template.parse(`<%groups.forEach(function(group,i){%>
                     <div><div class="pipeline_bundle">
                       <div class="pipelines"><div class="content_wrapper_outer">
@@ -322,7 +337,7 @@
                 }
                 
                 group.msg = '<img src="http://img2.cache.netease.com/auto/projects/club/v1.1/default/images/loadings.gif">';
-                group.lock = true;
+                group.lock = true;  //隐藏新增按钮
                 $.post(url, {
                     user: user,
                     vcpath: vcpath,
