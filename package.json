@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "name": "fepack",
   "author": {
-    "name": "shellchine"
+    "name": "shellchine",
+    "email": "shellchine@163.com"
   },
   "license": "MIT",
   "description": "Frontend Package and Distribute Tools",

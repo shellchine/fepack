@@ -128,7 +128,9 @@ exports.publishInc = async function(quiet){
         var url = await publish2cms(modelid, content, topicid, modelname);
         if (url) {
             //未根据url获取cmspath!!!
-            if(!CMSRESULT.inc[filekey]) CMSRESULT.inc[filekey] = {};
+            if(!CMSRESULT.inc[filekey]){
+                CMSRESULT.inc[filekey] = {};
+            }
             CMSRESULT.inc[filekey].cmspath = getCmsPath4Inc(modelname);
             CMSRESULT.inc[filekey].url = url;
             CMSRESULT.inc[filekey].md5 = util.getMd5(content);

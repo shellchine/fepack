@@ -121,7 +121,7 @@ function getSvnVer(paramJson){
         svnver.desc = env.moduleName + ' - ' + env.envName;
         if (/svn.ws.netease.com/.test(svnpath)) { //java项目
             var svnauth = "--username web --password 4web#163";
-            var tmp = util.execSync(`svn info $svnpath $svnauth --xml --no-auth-cache --non-interactive --trust-server-cert`);
+            var tmp = util.execSync(`svn info ${svnpath} ${svnauth} --xml --no-auth-cache --non-interactive --trust-server-cert`);
             if (/commit\s+revision="(\d+)"/.test(tmp)) {
                 svnver.new = RegExp.$1;
             }

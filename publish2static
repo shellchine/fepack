@@ -91,7 +91,8 @@ if(fs.existsSync(`${infoDir}/goscript/dist_dev.js`)){
 var failed = 0;
 
 if(!/devQA/i.test(stage)){
-    if(vc.publish.dev){ //发布未压缩版
+    //在前端测试机上发布原始版本，让${devHost}/${path}/${res}生效
+    if(vc.publish.dev){
         vc.publish.dev(vcver, vc.cdnfix+vc.path);
     }
     log("HTML例行检查", 2, 1);

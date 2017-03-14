@@ -1,6 +1,6 @@
     <pipeline name="{{name}}">
       <environmentvariables>
-        <variable name="GO_SYNC_TO">
+        <variable name="CMS_CHANNEL">
           <value>{{dest}}</value>
         </variable>
         <variable name="GO_CONFIG">

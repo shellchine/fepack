@@ -116,7 +116,7 @@ module.exports = function(app){
             name: project,
             vcpath: vcpath,
             dest: dest,
-            omad: '',
+            omad: dest == '-1' ? '1' : '',
             materials: $$.template.replace(conf.vc.materials, {vcpath:vcpath})
         }, null, '');
         
@@ -135,7 +135,6 @@ module.exports = function(app){
                 }else{
                     postConf["go_config[content]"] = xml.replace(/(?=\s*<\/pipelines>)/, "\n"+pipelineXml);
                 }
-                console.log(postConf);
                 await post(`${host}/go/admin/config_xml`, postConf);
                 await stmts.delProject.run(project);
                 await stmts.addProject.run(project, vcpath, user, user, type);
