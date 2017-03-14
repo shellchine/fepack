@@ -83,7 +83,10 @@ var projectJson = util.projectJson;
     if (!/Live/.test(stage)) {         //publishStage, publishQAStage
         await cp4live();
         await parseSSI(htmlDir);     //将html中的外部ssi全部内联
-        await Promise.all(packFns.map(fn => fn(htmlDir)));  //自定义打包流程: bowlder, vue, nej, regular...
+        await Promise.all(packFns.map(fn => {
+            fn(htmlDir)
+        }));  //自定义打包流程: bowlder, vue, nej, regular...
+
     }
     // 处理要发布到cms的文件
     if(cmsUtil && util.isDir(util.distCmsDir)){
