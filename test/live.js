@@ -9,5 +9,6 @@ program
 global.projectDir = program.path || "tie/yun/admin";
 var conf = require('./conf');
 
+proc.execSync(`cp -r ${conf.vcRoot}/${conf.projectDir}/* ${conf.workDir}/`);
 conf.chWorkDir();
 require('../publish2live');

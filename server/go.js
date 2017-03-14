@@ -66,7 +66,7 @@ module.exports = function(app){
     });
 
     app.get('/go/svnup/:project', function(req, res) { //更新本地SVN目录
-        var project = req.params.project;
+        var project = req.params.project;  //cd var/frontend/${projectPath}/; svn up -r ${ver}
         var ver = req.query.ver || 'HEAD';
         var partners = {};
         (async function(){

@@ -48,7 +48,7 @@
         scope.groups.forEach(group => {
             group.dir2dest = {};
             var list = [];
-            $.each(group.list, function(key, info){  //group: { type,name,label,list }  list:{ key:label,dest }
+            $.each(group.list, function(key, info){  //group: { type,name,label,list }  list:{ value:label,dest }
                 var arr = info.split(/,/);
                 for(var i = 1; i < arr.length; i ++){
                     group.dir2dest[arr[i]] = key;

@@ -46,7 +46,7 @@ var moduleNames = {};
 var projectJson = util.projectJson;
 var cloudRoot = "/var/cloud/go";
 var cloudSVNRoot = "https://static.f2e.netease.com/go";
-var rsyncParent = projectJson.parentProject;
+var rsyncParent = projectJson.parentProject||'';
 var omad = {}
 
 omad.publish = function(){
