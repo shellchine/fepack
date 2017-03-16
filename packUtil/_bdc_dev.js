@@ -23,6 +23,11 @@ function DevCollector(){ //测试阶段收集器
     this.codes = {js:'', css:'', commonLink:'', headScript:'', first:'', commonJSFirst:'', commonJS:'', purejs:''};
 }
 DevCollector.prototype = {
+    /*
+    * 如果不包含 link、style、script标签，直接返回。
+    * 如果包含link、style、script，且包含[endif] 则push到bdc.collectComments,返回<!--$collectComments[idnex]-->
+    * 否则返回空
+    * */
     procComment: function(tmp){
         var bdc = this;
         if(/<(link|style|script)/i.test(tmp)){
@@ -35,6 +40,10 @@ DevCollector.prototype = {
         }
         return tmp;
     },
+    /*
+    * set: bdc.alias, bdc.bowlderAlias
+    * @return {string} 返回完整ne-alias="url"
+    * */
     parseAlias: function(quote, alias){
         var bdc = this;
         bdc.alias = util.fulldir(alias, `/${vc.cdnfix}${vc.path}`);
@@ -42,9 +51,18 @@ DevCollector.prototype = {
         log(`Alias: ${bdc.alias}\n`);
         return `ne-alias=${quote}${conf.devHost}${bdc.alias}${quote}`;
     },
+    /*
+    *
+    * @param html {string} 文件内容
+    * @param htmlfile {string} 文件路径 /var/.../html4dev/...
+    * @isSub
+    * */
     init: async function(html, htmlfile, isSub){
         var bdc = this;
+
+        //处理ne-alias和注释
         html = html.replace(/ne-alias=(['"])(\S+?)\1/g, function(all, m1, m2){
+            //ne-alias="#2"
             return bdc.parseAlias(m1,m2);
         }).replace(/<!--[^#\!][\s\S]*?-->/g, function(all){
             return bdc.procComment(all);
@@ -149,6 +167,17 @@ DevCollector.prototype = {
         }
         return `<link ${attr}>`;
     },
+    /*
+    * 添加js
+    * @param file {string} 格式：src@charset;src@charset ...
+    * @param referURL {string}
+    *
+    * 添加 bdc.defined[!src]=1; 并且：
+    * util.headScriptMap指定的js,添加到 bdc.codes.headScript
+    * .com/common 、 .com/libs/  添加到  bdc.codes[bdc.commonCode]
+    * .com/modules/bowlder-xxx.js bdc.codes.commonJSFirst
+    *
+    * */
     addJs: async function (file, referURL){ //普通js依赖(!*.js)
         var bdc = this;
         //为正式版收集js
@@ -157,6 +186,7 @@ DevCollector.prototype = {
             var bowlderSrc = 0;
             src = util.fulldir(src, referURL);
             var gbk = 0;
+            //src@#1   src@gbk
             src = src.replace(/\@([\w\-]+)$/, function(all, m1){
                 var charset = m1;
                 if (/gb/i.test(charset)) {
@@ -166,9 +196,10 @@ DevCollector.prototype = {
             if (!bdc.defined["!"+src]) {
                 if (util.headScriptMap[src]) {
                     bdc.codes.headScript += `<script src="${src}"></script>\n`;
-                } else if (/\.com\/(common|libs)\//.test(src)) {
+                } else if (/\.com\/(common|libs)\//.test(src)) {    //.com/common  .com/libs/
                     bdc.codes[bdc.commonCode] += `<script src="${src}"></script>\n`;
                 } else if (/\.com\/(modules\/bowlder\-[\d\.]+?\.js([\#\?].*)?)/.test(src)) {
+                    //.com/modules/bowlder-xxx.js
                     bdc.codes.commonJSFirst += `<script src="${vc.resRoot}/${RegExp.$1}"></script>\n`;
                 } else {
                     global.jscount ++;
@@ -257,8 +288,30 @@ DevCollector.prototype = {
         }
         return html;
     },
+    /*
+    * 收集script标签
+    * @param html {string} 分析的内容。
+    *
+    * 如果有src属性:
+    * 1.分析所有script标签,扩展src为完整url路径。 conf.devHost
+    * 2.添加bcd.defined[!src]=1;
+    * 3.并且:
+    *   if util.headScriptMap指定的js,添加到 bdc.codes.headScript
+    *   else
+    *       添加到 bdc.codes.js
+    *       com/common 、 .com/libs/  添加到  bdc.codes[bdc.commonCode]
+    *       .com/modules/bowlder-xxx.js bdc.codes.commonJSFirst
+    *
+    * 如果没有src属性，比如内联的script代码:
+    *   if 包含_drop标签 添加到 bdc.codes.js
+    *   else
+    *       if 显示指定type不是text/template 添加到 bdc.codes[bdc.commonCode]
+    *       else 添加到 bdc.codes.js
+    * */
     collectJs: async function (html){
         var bdc = this;
+        //<script #1 > #2 </script>
+        //<!--!include collector="first"-->
         var reg = new RegExp(`<script([^\\*\\[\\(\\+]*?)>\\n*([\\s\\S]*?)\\s*</script>|${firstCollector}`, 'ig');
         var result;
         while ((result = reg.exec(html))){
@@ -271,23 +324,34 @@ DevCollector.prototype = {
                 bdc.codes.js = '';
                 continue;
             }
+            /*
+            * 以下条件 && 操作
+            *  不包含 text/template || 包含 id="
+            *  不包含 ne-alias || 不包含//g.163.com || 不包含//analytics.163.com || 不包含wrating.js
+            *  不包含 document.write || 不包含vJTrack ||  不包含neteaseTracker
+            * */
             if ((!/text\/template/i.test(attr) || / id="/.test(attr))
                 && !/ ne-(?!alias)|\/\/(g|analytics)\.163\.com|wrating\.js/.test(attr)
                 && !/ _keep=\S+?( |\/|$)/.test(attr)
                 && !/document\.write|vjTrack|neteaseTracker/.test(script)) {
+                // scr="#2"
                 if (/src=(['"])\s*(\S+?)\s*\1/i.test(attr)) {
                     var src = RegExp.$2;
                     var jsurl_root = `${conf.devHost}/${vc.cdnfix}` + global.VCPATH;
+
+                    //扩展src为完整url
                     if (!/https?:\/\//i.test(src)) {
                         src = util.fulldir(src, jsurl_root);
                         if(!/https?:\/\//.test(src)){
                             continue;
                         }
                     }
+
                     //print "收集js: $src\n";
                     if (!bdc.defined[`!${src}`]) {
-                        if(!/ _drop(=| |$)/.test(attr)){
+                        if(!/ _drop(=| |$)/.test(attr)){ //不包含_drop标签
                             var charset = '';
+                            //charset='gbk' charset='gb2312'
                             if (/charset\s*=\s*(['"]?)(gbk|gb2312)\1/i.test(attr)) {
                                 charset = '@gbk';
                             }
@@ -302,7 +366,8 @@ DevCollector.prototype = {
                             }
                         }
                     }
-                } else {
+                }
+                else {
                     if(!/ _drop(=| |$)/.test(attr)){  //不收集标记_drop的片断
                         if(/type=/.test(attr) && !/text\/javascript/i.test(attr)){
                             bdc.codes[bdc.commonCode] += `<script${attr}>\n${script}\n</script>\n`;
@@ -370,6 +435,13 @@ DevCollector.prototype = {
             }
         }
     },
+    /*
+    * 处理url()中的链接。
+    * 如果是http(s)://开头，则fulldir()替换。
+    * 否则直接返回.
+    * @param src {string} 有可能包含引号
+    * @param cssroot
+    * */
     procss: function (src, cssroot){
         var bdc = this;
         var quote = "";
@@ -384,5 +456,5 @@ DevCollector.prototype = {
 
         return `url(${quote}${src}${quote})`;
     }
-}
+};
 module.exports = DevCollector;
