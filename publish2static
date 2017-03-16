@@ -293,7 +293,7 @@ function parseRes(dir, clear){ // 处理代码中的资源地址(改为绝对路
                 html = util.expandFullPath(html);
             }
             if(clear){
-                html = html.replace(/\s*<meta\s+name="cms_id".*?>\s*/ig, "\n"); //避免暴露cmsid
+                html = html.replace(/\s*<meta\s+name="cms_id"[\s\S]*?>\s*/ig, "\n"); //避免暴露cmsid
             }
 
             writeWork(file, html);

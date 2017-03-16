@@ -198,7 +198,7 @@ async function inlineSSI(file, relroot){
         }
     }
     html = await util.replaceAsync(html, /<!--#include\s+(file|virtual)=(['"])(\S*?)\2\s*-->/ig, (all, m1, m2, m3) => inlineSSI(m3, reldir));
-    html = html.replace(/<meta\s+name="cms_id".*?>\s*/ig, '');
+    html = html.replace(/<meta\s+name="cms_id"[\s\S]*?>\s*/ig, '');
     return (inlineSSICache[file] = html);
 }
 
@@ -344,7 +344,7 @@ function cpHtml(fullname, base){
         var tmp = util.readWork(fullname);
         tmp = tmp.replace(/<!--\s*<meta.*?-->/ig, '');
         //复制到发布预处理目录
-        if (/<meta\s*name="cms_id".*?content="\d{4}\S+?"/i.test(tmp)) {
+        if (/<meta\s*name="cms_id"[\s\S]*?content="\d{4}\S+?"/i.test(tmp)) {
             odir = util.getFolder(`${util.distCmsDir}/${dir}`);
             log(`Prepare CMS Page: ${fullname}\n`);
             util.cpFile(fullname, odir);
