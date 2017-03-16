@@ -62,7 +62,7 @@ var infoDir = util.infoDir;
 var backupDir = util.backupDir;
 //临时目录
 var tmpDir = util.tmpDir;
-var htmlDir = util.distHtmlDir = util.getFolder(`${util.distDir}/html4dev`, true);
+var htmlDir = util.distHtmlDir = util.getFolder(`${util.distDir}/html4dev`, true);  // var/fepack/dist/{project}/html4dev
 var readHtml = read.bind(null, htmlDir);
 var writeHtml = write.bind(null, htmlDir);
 var projectJson = util.projectJson;
@@ -148,9 +148,9 @@ util.printTime();
         return util.isValidDir(dir);
     }, function(file, base){
         var flag = util.isValidFile(base);
-        if (flag == 9) {
+        if (flag == 9) {    //(s)html,xml,json => html4dev/
             cpHtml(file, base);
-        } else if(flag == 10) { //不发布到static服务器及cdn的其它文件
+        } else if(flag == 10) { //不发布到static服务器及cdn的其它文件 => static/
             cpRes(file, base);
         }
     });
@@ -167,7 +167,7 @@ util.printTime();
         }
     }
     
-    await Promise.all(packFns.map(fn => fn(htmlDir)));  //自定义打包流程: bowlder, vue, nej, regular...
+     await Promise.all(packFns.map(fn => fn(htmlDir)));  //自定义打包流程: bowlder, vue, nej, regular...
 
     // 同步到后端服务器(非云主机)
     if (util.syncTo || projectJson[cloudEnv] || ENV[cloudEnv]) {
@@ -268,7 +268,14 @@ function validCss(file){
     return errors.map(msg => " - " + msg).join("\n");
 }
 
-function parseRes(dir, clear){ // 处理代码中的资源地址(改为绝对路径)
+/*
+* 转换dir下文件中的地址为static(conf.devHost)地址(fulldir);
+* @param dir {string} 目录
+* @param clear {bool} 是否清除meta[cmd_id]标签
+*
+* 实际dir传入的为html4dev, 该目录下只有 html/xml/json文件。
+* */
+function parseRes(dir, clear){ // 处理代码中的资源地址(改为绝对路径)  //dir=>html4dev
     log(`[parseRes] ${dir}`, 2, 1);
     util.lsr(dir).forEach(file => {
         if(util.isPreserved(file)){
@@ -281,13 +288,14 @@ function parseRes(dir, clear){ // 处理代码中的资源地址(改为绝对路
             var html = readWork(file);
             //对于非ssi碎片，改变fulldir()所用的相对路径
             var tmppath = path.dirname(file);
-            if (tmppath != dir && /<html|#header/i.test(html)) {
+            if (tmppath != dir && /<html|#header/i.test(html)) {    // html4dev/的孙子目录 && 包含<html|#header  : 主文件
                 tmppath = tmppath.replace(new RegExp(tmpDir + `/[^/]*?/`), "");
                 if (tmppath) { //不是项目根目录
                     global.VCPATH = vc.path+"/"+tmppath;
                 }
             } 
             if(ext == ".json"){
+                // 替换: "*/*-*.*.js"  "*/*-*.css"  (*为\w)  ==> fulldir()
                 html = html.replace(/"([\w\/\-\.]*?\.(js|css))"/g, (all, m1) => '"'+util.fulldir(m1)+'"');
             }else{
                 html = util.expandFullPath(html);
@@ -302,25 +310,32 @@ function parseRes(dir, clear){ // 处理代码中的资源地址(改为绝对路
     });
 }
 
+//递归分析ssi,返回ssi对应的html   (删除其中的meta[cms_id]标签)
 function inlineSSI(file, relroot){
     var ssifile = file;
     relroot = relroot.replace(new RegExp(tmpDir + `/[^/]*`), "/"+vc.cdnfix+vc.path);
     //只接受/开头的路径
-    if(!/^\//.test(ssifile)){
-        if (/^\//.test(relroot)) {
+    if(!/^\//.test(ssifile)){   // ssi 不是/开头
+        if (/^\//.test(relroot)) {  //relroot是/开头
             relroot = relroot.replace(vc.localhost, '');
-            ssifile = path.resolve(relroot, ssifile);
+            ssifile = path.resolve(relroot, ssifile);   //ssi替换为本地绝对路径。
         } else {
             global.exitERR("", "替换内联SSI出错: "+ssifile);
         }
     }
+    // /vc.path/inc 本项目    /special/ cms
     if(ssifile.indexOf("/"+vc.cdnfix+vc.path+"/inc/") == 0
        || ssifile.indexOf("/special/") == 0){ //本项目或线上(cms)碎片
         return `<!--#include file="${file}"-->`;
     }
     var reldir = path.dirname(ssifile);
     var html;
-    if(ENV.GO_TEST || ~ssifile.indexOf(vc.cdnfix+vc.path)){
+    //ssi的可能性
+    //  1. /special/  绝对路径  cms内容
+    //  2. inc/xx      相对路径 当前项目下内容
+    //  3  /sports/testgo  绝对路径， 对应svn路径。
+    if(ENV.GO_TEST || ~ssifile.indexOf(vc.cdnfix+vc.path)){ //ssi包含 vc.cdnfix+vc.path ,视作本项目内容
+        //场景:  inc/xx的ssi,在之前会被替换为绝对路径，指向/var/fepack/dist/{project}/html4dev/ssi下的文件。
         html = readWork(path.resolve(vc.localhost, ssifile));
     }else{
         html = execSync(`svn cat ${vc.host}${ssifile} ${vc.auth}`);
@@ -334,15 +349,20 @@ function inlineSSI(file, relroot){
     return html;
 }
 
-function parseSSI(path){ //替换跨频道SSI
+//清除_group属性，
+//<!--\\#include  转换为:  <!--#include
+//如果存在util.syncTo, 则内联所有ssi  (本地: /vc.path/ 和 cms: /special/ 的ssi不内联)
+function parseSSI(path){ //替换跨频道SSI  // path => /var/.../html4dev
     log("[publish2static] 替换跨频道SSI("+path+")", 2, 1);
-    util.lsr(path, /\.s?html'/).forEach(file => {
+    util.lsr(path, /\.s?html/).forEach(file => {
         file = file.trim();
         util.stack(`出错文件: ${file}`);
         var content = readWork(file);
-        log(`处理${f}中的SSI..`);
+        log(`处理${file}中的SSI..\n`);
         var relroot = file.replace(vc.localhost, '/');
         if(util.syncTo && conf.vc.type != 'git'){   //内联所有跨项目的ssi(/、modules、widget或../开头都要替换)
+            //group3: 匹配 include标签里，
+            //      以/、modules、widget、../开头的    file|virtual 属性值。
             content = content.replace(/<!--#include\s+(file|virtual)\s*=\s*(["'])((\/|widget|modules|\.\.\/)\S*?)\2\s*-->/ig, (all, m1, m2, m3) => inlineSSI(m3, relroot));
         }
         content = content.replace(/ _group="\S+"/g, '');

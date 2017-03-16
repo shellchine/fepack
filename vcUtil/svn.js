@@ -14,21 +14,36 @@ var ENV = process.env;
 * mixin:
 *
 * auth          {string}    svn登录验证信息
-* path          {string}     frontend
-* host          {string}    https://svn.ws.netease.com
-* cdnfix        {string}    默认为空。如果conf.vc.host带有路径，则为"z/"
 * writer        {string}    svn Last Changed Author
+* read          {function}  @param file.  跨项目读取文件。      读取 svn.localhost/file 文件内容。 ==> "/var/frontend"+file
+* upload        {function}  function(file {string} ,ftpPublish {function} )     下载svn.host/file文件。拼接好ftp上传命令，传递给ftpPublish
+* exist         {function}  检查指定的文件在本地是否存在
 * publish.dev   {function} wget http://tools.f2e.netease.com/cgi-bin/svn.cgi?ver=${ver}&dir=${dir}
 *                       通过页面打开可查看。 把static服务器的代码同步到指定版本
 *                       如果GO_TEST，则跳过.
 * publish.qa    {function}
 * publish.live  {function}
-* read          {function}  @param file.  跨项目读取文件。
-*                       读取 svn.localhost/file 文件内容。 ==> "/var/frontend"+file
-* upload        {function}  function(file {string} ,ftpPublish {function} )
-*                       下载svn.host/file文件。拼接好ftp上传命令，传递给ftpPublish
-* exist         {function}  检查指定的文件在本地是否存在
 *
+*
+ svn.ws.netease.com/frontend/下的项目:
+ * host          {string}    https://svn.ws.netease.com/frontend
+ * path          {string}    项目路径，sports/testgo   前面不带/
+ * cdnfix        {string}    ''
+ *
+ svn.ws.netease.com/下的项目
+ * host          {string}    https://svn.ws.netease.com
+ * path          {string}    host之后的路径。 前面不带/
+ * cdnfix        {string}    'z/'
+ *
+ *
+ util4go下的mixin:
+ * resRoot      {string}    conf.cdns[0].base,  http://img2.cache.netease.com/f2e
+ * cdnBase      {string}    cdn基准目录     resRoot/cdnfix+path
+ * base         {string}    项目远端仓库地址    host+path
+ * localpath    {string}    项目本地仓库地址    localhost/ cdnfix + path
+ * devpath      {string}    devHost上的本项目目录  conf.devHost / cdnfix + path
+ *
+
 * */
 module.exports = function(svn){
     // /var/fepack/info/.svnauth

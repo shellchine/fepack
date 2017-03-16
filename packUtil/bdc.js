@@ -46,9 +46,9 @@ var bdDir = {
     res: util.getFolder(`${util.distDir}/collect`, 1) //收集后的js/css
 };
 var logfiles = util.logfiles, logfmts = util.logfmts;
-var collectorRex = /<!--!include\s+collector=|<script\s.*?bowlder[\-\d\.]*?\.js/;
+var collectorRex = /<!--!include\s+collector=|<script\s.*?bowlder[\-\d\.]*?\.js/;       //<!--!include collector=  |  script bowlderxxx.js
 
-function collectFiles(htmlDir){ //找到需要处理的文件列表
+function collectFiles(htmlDir){ //找到需要处理的文件列表  :  包含<!--!include collector=  |  script bowlderxxx.js 的文件
     var files = [];
     util.lsr(htmlDir, /\.s?html?$/).forEach(file => {
         var html = util.readTmp(file);
@@ -60,24 +60,27 @@ function collectFiles(htmlDir){ //找到需要处理的文件列表
     return files;
 }
 
-var fetchCollectHtml = util.fetchCollectHtml = async function (file){
+//处理文件中的@路径和引用的ssi;
+var fetchCollectHtml = util.fetchCollectHtml = async function (file){  // /var/.../dist/project/html4dev/...
     log(`生成收集用的html(${file}) ..\n`);
     var html = await util.fetchUrl(file);
     var abspath = path.dirname(file.replace(conf.devHost, vc.localhost));
     var modulePath = (abspath + '/')
         .replace(vc.localhost, '')
         .replace(util.distHtmlDir +'/', `/${vc.cdnfix}${vc.path}/`);
-    //fix @ path
+    //fix @ path    替换@的路径
     html = html.replace(/((href|ne-module|ne-plugin|ne-extend)=['"])\@/g, '$1'+modulePath)
         .replace(/<!--#include\s+(file|virtual)=(['"])(.*?)\2\s*-->/ig, function(all, m1, m2, m3){
+            //m1: virtual|file   m3: 属性值
+            //cms和inc/下的ssi,保持不变，其他ssi内联。
             return fetchSSI(m3, abspath, m1);
         });
     return html;
-}
+};
 var DevCollector = require('./_bdc_dev');
 var LiveCollector = require('./_bdc_live');
 
-exports.dev = async function(htmlDir){
+exports.dev = async function(htmlDir){  //htmlDir: html4dev
     bdDir.inc = util.getFolder(`${htmlDir}/inc`);
     var vcpath = global.VCPATH;
     //将packModuleDir中的js所需依赖全部收集，与html共同发布(便于动态加载)
@@ -118,7 +121,7 @@ exports.dev = async function(htmlDir){
         var vm = file.replace(util.distDir+'/', '').replace(/^[^\/]*/, ''); //相对项目根目录的路径
         var url = vc.devpath + vm; //"http://127.0.0.1:8990/tie/yun/sitegov" + "/info.html"
         log(`\n开始收集 ${file}: `, 2, 1);
-        var html = await fetchCollectHtml(file);
+        var html = await fetchCollectHtml(file); //获取文件内容。(已处理@路径和ssi)
         // 未收集的html源码
         if (html) {
             var bdc = new DevCollector();
@@ -128,15 +131,20 @@ exports.dev = async function(htmlDir){
             if (/:\/\/.*?\/(z\/)?(\S+)\//.test(url)) {
                 global.VCPATH = RegExp.$2;
             }
+            //include collector="head"
             if (!/<!--!include\s+collector=(['"])head\1/.test(html)) {
+                //在header标签中的script标签前，添加include collector="head"
                 html = html.replace(/((<script.*?>\s*)*(<\/head>|<body))/i, '<!--!include collector="head"-->\n$1');
             }
             if (/<script\s.*?bowlder[\-\d\.]*?\.js/i.test(html)) {
                 hasBowlder = 1;
             }
+            //include collector="foot"
             if (/<body/i.test(html) && !/<!--!include\s+collector=(['"])foot\1/.test(html)){
                 html = html.replace(/(<script\s[^>]*?bowlder[\-\d\.]*?\.js['"].*?<\/script>|<\/body>)/i, `<!--!include collector="foot"-->\n$1`);
+                //在bowlder.js的script标签前，添加include collector="foot"
             }
+            //替换文件中的 url()链接  => fulldir()
             html = html.replace(/\burl\((\S+?)\)/ig, function(all, m1){
                 return bdc.procss(m1);
             });
@@ -146,6 +154,7 @@ exports.dev = async function(htmlDir){
             bdc.codes.purejs = bdc.codes.js;
             bdc.codes.js = '';
             log(`收集bowlder模块 ...\n`);
+            //file: /var/.../html4dev/...
             html = await bdc.init(html, file);
             bdc.collectedCss.forEach(function(cssFile){ //将<link>收集到一起，由collectCss方法合并
                 var link = `<link href="${cssFile}" rel="stylesheet" />`;
@@ -237,18 +246,28 @@ exports.dev = async function(htmlDir){
             //process.exit(1);
         }
     });
-}
+};
 
+/*
+*
+* cms ssi / 本项目下inc/目录的 ssi ，保持
+* 其他能找到其文件的ssi,则内联
+*
+* @param ssi值
+* @param abspath 绝对路径，引用了该ssi的文件路径
+* @param ssikey  file|virtual
+* */
 function fetchSSI(ssi, abspath, ssikey){
     if(ssikey){
         ssikey = "virtual";
     }
-    var aliasMatch;
-    for(var alias in util.homeMap){
-        ssi = ssi.replace(new RegExp(`(\\.com|^)/?${alias}/`), util.homeMap[alias] + '/');
-        if (aliasMatch){
-            break;
-        }
+    // var aliasMatch;
+    for(var alias in util.homeMap){ //alias: ~
+        // .com/~/ .com~/ ~/替换成项目目录  sports/testgo
+        ssi = ssi.replace(new RegExp(`(\\.com|^)/?${alias}/`), '$1'+util.homeMap[alias] + '/');
+        // if (aliasMatch){
+        //     break;
+        // }
     }
     var file = util.expandSSIPath(ssi, abspath);
     ssi = file.replace(vc.localhost + '/', '/');
@@ -261,7 +280,8 @@ function fetchSSI(ssi, abspath, ssikey){
         ssi = ssi.replace(/.*?\/mods\//, '');
         result = '@@' + ssi + '@@';
         log(`本项目Mods(${file}) .. \n`);
-    }else if (ssitype == 0) {  //外部SSI
+    }
+    else if (ssitype == 0) {  //外部SSI
         log(`外部SSI(${file}) .. \n`);
         if (ENV.CMS_CHANNEL && getCmspath(file)) {
             log("   保持SSI\n");
