@@ -83,9 +83,7 @@ var projectJson = util.projectJson;
     if (!/Live/.test(stage)) {         //publishStage, publishQAStage
         await cp4live();
         await parseSSI(htmlDir);     //将html中的外部ssi全部内联
-        await Promise.all(packFns.map(fn => {
-            fn(htmlDir)
-        }));  //自定义打包流程: bowlder, vue, nej, regular...
+        await Promise.all(packFns.map(fn => fn(htmlDir)));  //自定义打包流程: bowlder, vue, nej, regular...
 
     }
     // 处理要发布到cms的文件
@@ -326,6 +324,7 @@ function upload2ImgCdn(clear){
 }
 
 function cpHtml(fullname, base){
+    var dir = path.dirname(fullname);
     if(projectJson.skipRes && /(^|\/)(modules|widget)(\/|$)/.test(dir)){
         return;
     }
@@ -335,7 +334,6 @@ function cpHtml(fullname, base){
     if(projectJson.blackList && (projectJson.blackList[base] || projectJson.blackList[dir])){
         return;
     }
-    var dir = path.dirname(fullname);
     var odir = util.getFolder(`${htmlDir}/${dir}`);
     if(!util.isPreserved(base)){
         console.log(`Prepare Page: ${fullname}`);

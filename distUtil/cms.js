@@ -367,7 +367,7 @@ async function publish2cms(modelid, content, topicid, modelname){
     var channelID = modelid.replace(/.*?(\d{4}).*/, '$1');
     var extCMS = channelID > '0100' && channelID < '1000';  //房产外包
     if (!extCMS) {
-        content = iconv.encode(iconv.decode(content, 'utf-8'), 'gbk');
+        content = iconv.encode(content, 'gbk');
     }
 
     var api = extCMS ? 'http://housecms.ws.netease.com/servlet/publishspecial.do' : 'https://cms.ws.netease.com/servlet/webservice.do';

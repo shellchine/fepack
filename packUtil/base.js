@@ -269,10 +269,6 @@ var parseCssAddr = async function(tmp, spaces, groups) { //多个link合并时�
                     }
                     //替换相对路径
                     [content, csscount] = await preCssPack(content, url, compress);
-                    //utf-8 -> gbk (css)
-                    if (/charset\s*=\s*(['"]?)gb(2312|k)\1/i.test(tmp)) {
-                        content = iconv.encode(iconv.decode(content, 'gbk'), 'utf-8');
-                    }
                     content = util.toAscii(content);
                     return `<style>\n${content}</style>${spaces}\n`;
                 }
@@ -334,13 +330,10 @@ var parseJsAddr = async function(tmp, spaces, groups) {
         }
         if (print) {   //js打印成<script>
             var compressed = '';
-            var content = await util.fetchUrl(url);
+            var isGBK = /charset\s*=\s*(['"]?)(gbk|gb2312)\1/i.test(tmp);
+            var content = await util.fetchUrl(url, isGBK);
             if (content) {
                 content = util.quoteAddr2Cdn(util.uniformStaticAddr(content));
-                //gbk -> utf-8 (js)
-                if (/charset\s*=\s*(['"]?)(gbk|gb2312)\1/i.test(tmp)) {
-                    content = iconv.encode(iconv.decode(content, 'gbk'), 'utf-8');
-                }
                 //script打印到页面
                 var compress = 2;  //默认混淆压缩，否则cms容易报错
                 if (/_compress\s*=\s*(['"])(\S+?)\1/i.test(tmp)) {
