@@ -7,7 +7,7 @@ if(!fs.existsSync(pipeDir)){
 }
 
 var projectDir = global.projectDir.replace(/\\/g, '/').replace(/^\/|\/$/g, '');
-var projectName = projectDir.replace(/\//g, '_');
+var projectName = projectDir.replace(/.*\//g, '_');
 var workDir = `${pipeDir}/${projectName}`;
 if(!fs.existsSync(workDir)){
     mkdirp.sync(workDir);
@@ -17,10 +17,11 @@ var env = {
     GO_PIPELINE_COUNTER: 1,
     GO_PIPELINE_LABEL: 3,
     GO_STAGE_COUNTER: 1,
+    GO_STAGE_NAME: "devStage",
     GO_REVISION: 674499,
     GO_TO_REVISION: 674499,
     GO_FROM_REVISION: 674499,
-    GO_CONFIG: "conf",
+    GO_CONFIG: "conf.rongcloud",
     CSS_COMPRESS: 1,
     JS_COMPRESS: 2,
     GO_SYNC_TO: 0,

@@ -6,9 +6,9 @@ program
     .option('-p, --path [path]', 'Specify the project path relative to SVN root')
     .parse(process.argv);
 
-global.projectDir = program.path || "tie/yun/admin";
+global.projectDir = program.path || "web-team_web-site";
 var conf = require('./conf');
 
-proc.execSync(`cp -r ${conf.vcRoot}/${conf.projectDir}/* ${conf.workDir}/`);
+//proc.execSync(`cp -r ${conf.vcRoot}/${conf.projectDir}/* ${conf.workDir}/`);
 conf.chWorkDir();
 require('../publish2static');

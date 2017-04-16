@@ -1,11 +1,8 @@
 var fs = require('fs');
 var path = require('path');
-var request = require('request').defaults({jar: true});
+var request = require('request');
 var Store = require('../lib/store');
 var $$ = require('../lib/bowlder');
-var proc = require('child_process');
-var express = require('express');
-var connectSSI = require('connect-ssi')
 var confFile = path.resolve(__dirname, 'conf.js');
 if(!fs.existsSync(confFile)){
     confFile = path.resolve(__dirname, 'conf.sample');
@@ -15,17 +12,6 @@ var conf = require(confFile);
 var host = "http://127.0.0.1:8153";
 
 module.exports = function(app){
-    var distDir = `${conf.cacheDir}/dist`;
-    app.use(connectSSI({
-	    ext: '.html',
-        baseDir: conf.cacheDir
-    }));
-    app.use(connectSSI({
-	    ext: '.shtml',
-        baseDir: conf.cacheDir
-    }));
-    app.use('/dist', express.static(distDir));
-    app.use(express.static(conf.vcDir));
     var infoDir = `${conf.cacheDir}/info`;
     var pwFile = `${infoDir}/.goaccess`;
     if(!fs.existsSync(pwFile)){
@@ -36,7 +22,6 @@ module.exports = function(app){
     var stmts = {
         pipelines: goDb.prepare("select * from pipelines"),
         admins: goDb.prepare("select * from users where role='1'"),
-        users: goDb.prepare("select * from users where role!='1'"),
         getPartners: goDb.prepare("select manager from pipelines where name=?"),
         setPartners: goDb.prepare("update pipelines set manager=? where name=?"),
         delProject: goDb.prepare("delete from pipelines where name=?"),
@@ -48,14 +33,14 @@ module.exports = function(app){
     app.get('/go/list', function(req, res) { //获取概览信息
         (async function(){
             var pipelines = {};
-            $$.each(await stmts.pipelines.all(), item=>{    //select * from pipelines //name, vcpath, manager, creator, gid
+            $$.each(await stmts.pipelines.all(), item=>{
                 pipelines[item.name] = {
                     group: item.gid,
                     manager: item.manager
                 }
             });
             var admins = {};
-            $$.each(await stmts.admins.all(), item=>{       //select * from users where role='1' //name, fullname, role
+            $$.each(await stmts.admins.all(), item=>{
                 admins[item.name] = 1;
             });
             
@@ -66,35 +51,15 @@ module.exports = function(app){
         })();
     });
 
-    app.get('/go/svnup/:project', function(req, res) { //更新本地SVN目录
-        var project = req.params.project;  //cd var/frontend/${projectPath}/; svn up -r ${ver}
-        var ver = req.query.ver || 'HEAD';
-        (async function(){
-            proc.execSync(`svn up`);
-            res.jsonp({
-
-            });
-        })();
-    });
-
     app.get('/go/partners/:project', function(req, res) { //获取项目开发者列表
         var project = req.params.project;
         var partners = {};
         (async function(){
-            var users = await stmts.users.all();
             var tmp = await stmts.getPartners.get(project);
-	    var notUsers = [];
-            $$.each(tmp.manager.split(/,/), item=>{
-                partners[item] = 1;
-            });
-            $$.each(users, user=>{
-		if(partners[user.name]) return;
-		notUsers.push({
-		    label: user.fullname,
-		    value: user.name
-		});
-            });
-            res.jsonp(notUsers);
+            if(tmp) $$.each(tmp.manager.split(/,/, item=>{
+                partners[item.name] = 1;
+            }));
+            res.jsonp(partners);
         })();
     });
 
@@ -102,16 +67,8 @@ module.exports = function(app){
         var type = req.params.type;
         var user = req.body.user;
         var vcpath = req.body.vcpath;
-        var dest = req.body.dest;       //public/goconf.js 里的group.list里的key
+        var dest = req.body.dest;
         var authFile = path.resolve(__dirname, conf.authFile);
-        if(!vcpath){
-            res.jsonp({
-                status: "fail",
-                msg: "no vcpath"
-            });
-            return;
-	}
-	vcpath = vcpath.replace(/(\.git)?$/, '.git'); 
         if(!fs.existsSync(authFile)){
             res.jsonp({
                 status: "fail",
@@ -128,21 +85,22 @@ module.exports = function(app){
             });
             return;
         }
-        var project = vcpath.replace(/\/+$/, '').replace(/.*\//, '').replace(/\.git$/, '');  //项目名称
+        var project = vcpath.replace(/\//g, '_');
         var pipelineXml = $$.template.replace(fs.readFileSync(pipelineFile).toString(), {
             name: project,
             vcpath: vcpath,
             dest: dest,
-            omad: dest == '-1' ? '1' : '',
-            materials: $$.template.replace(conf.vc.materials, {vcpath:vcpath})
+            omad: ''
         }, null, '');
         
         (async function(){
             try{
-                await post(`${host}/go/auth/security_check`, {
+console.log(1);
+var a =                await post(`${host}/go/auth/security_check`, {
                     j_password: auth[1],
                     j_username: auth[0]
                 });
+console.log(a);
                 var [postConf, xml] = getXmlConf(await get(`${host}/go/admin/config_xml/edit`));
                 if(xml.indexOf(`<pipeline name="${project}">`) != -1){
                     res.jsonp({
@@ -150,15 +108,14 @@ module.exports = function(app){
                         "status":"failed"
                     });
                 }else{
-                    postConf["go_config[content]"] = xml.replace(/(?=\s*<\/pipelines>)/, "\n"+pipelineXml);
+                    postConf["go_config[content]"] = xml.replace(/(?:\s*<\/pipelines>)/, "\n"+pipelineXml);
                 }
                 await post(`${host}/go/admin/config_xml`, postConf);
                 await stmts.delProject.run(project);
                 await stmts.addProject.run(project, vcpath, user, user, type);
                 res.jsonp({
                     status: "success",
-                    msg: "添加项目成功",
-                    name:project
+                    msg: "添加项目成功"
                 });
             }catch(e){
                 res.jsonp({
@@ -172,10 +129,6 @@ module.exports = function(app){
     app.post('/go/user/add', function(req, res) { //添加用户
         var id = req.body.id;
         var name = req.body.name;
-	if(!id || !name){
-		res.jsonp({status: "fail", msg: `id或name不能为空`});
-		return;
-	}
         
         (async function(){
             try{
@@ -230,7 +183,7 @@ module.exports = function(app){
         }
     });
     
-    app.post('/go/addpartner/:project', function(req, res) { //添加项目开发者  追加manage,逗号分隔
+    app.post('/go/addpartner/:project', function(req, res) { //添加项目开发者
         var project = req.params.project;
         var user = req.body.newpartner;
         (async function(){
@@ -246,12 +199,16 @@ module.exports = function(app){
 
 }
 
-function post(url, data){
+function post(url, data, conf){
+    conf = $$.extend({jar: true}, conf);
     return new Promise((resolve, reject) => {
-        request.post(url, {form: data}, function(err, res, body){
+console.log(data);
+        request.post(url, data, conf, function(err, res, body){
             if(err){
                 reject(err);
+console.log(err);
             }else{
+console.log(body);
                 resolve(body);
             }
         })
@@ -259,9 +216,10 @@ function post(url, data){
 }
 
 
-function get(url){
+function get(url, conf){
+    conf = $$.extend({jar: true}, conf);
     return new Promise((resolve, reject) => {
-        request.get(url, function(err, res, body){
+        request.get(url, conf, function(err, res, body){
             if(err){
                 reject(err);
             }else{

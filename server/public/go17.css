@@ -1,7 +1,7 @@
 h2 input{font-size:13px;color:#555}
 .vcpath{width:220px}
 .f2e-tools-wrap{position: absolute;right: 5px;top:53px;z-index:9}
-.f2e-tools-wrap select{width:auto}
+.f2e-tools-wrap select{width:auto;margin:0}
 .quickadd-link{font-size:13px;margin-left:20px;color:#667;cursor:pointer}
 .quickadd-form{font-size:13px;color:#667;display:inline-block;margin-left:20px}
 .quickadd-msg img{vertical-align:middle}

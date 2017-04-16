@@ -14,6 +14,6 @@ program
 var port = program.port || 8989;
 
 nproxy(port, {
-    "responderListFilePath": program.list || "proxy.js",
+    "responderListFilePath": program.list || "proxy.conf",
     "debug": !!program.debug
 });

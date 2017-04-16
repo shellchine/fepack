@@ -69,10 +69,12 @@ var projectJson = util.projectJson;
 
 var distUtils = global.distUtils = {};
 var distFns = [], packFns = [];
-$$.each(conf.devDist, name=>{
+$$.each(projectJson.devDist || conf.devDist, json=>{
+    if(typeof json == 'string') json = {type: json};
+    var name = json.type;
     distUtils[name] = require("./distUtil/" + name);
     if(distUtils[name] && $$.isFunction(distUtils[name].publish)){
-        distFns.push(distUtils[name].publish);
+        distFns.push(distUtils[name].publish.bind(null, json));
     }
 });
 $$.each(conf.pack, name=>{
@@ -160,20 +162,20 @@ util.printTime();
     if(!/devQA/i.test(stage)){
 
         // 6. 扩展相对路径(仅后端项目)
-        if (util.syncTo || projectJson[cloudEnv] || ENV[cloudEnv]) {
+        //if (util.syncTo || projectJson[cloudEnv] || ENV[cloudEnv]) {
             log(`处理${htmlDir}目录(parseSSI)`, 2, 1);
             parseSSI(htmlDir);     //内联所有外部ssi
             parseRes(htmlDir);     //处理资源路径
-        }
+        //}
     }
     
      await Promise.all(packFns.map(fn => fn(htmlDir)));  //自定义打包流程: bowlder, vue, nej, regular...
 
     // 同步到后端服务器(非云主机)
-    if (util.syncTo || projectJson[cloudEnv] || ENV[cloudEnv]) {
+    //if (util.syncTo || projectJson[cloudEnv] || ENV[cloudEnv]) {
         var rDir = util.syncTo && util.syncTo.static;
         util.proc4backend(htmlDir, rDir);
-    }
+    //}
 
     // 10. 打包页面文件
     execSync(`cd ${htmlDir}; tar zcf ../html4dev.tar.gz *`);

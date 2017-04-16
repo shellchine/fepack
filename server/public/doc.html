@@ -1,0 +1,176 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <base target="_blank" />
+  <title>Markdown Viewer</title>
+  <style>
+body{font-family:verdana,arial,"微软雅黑";font-size:14px;color:#444}
+*{margin:0;padding:0}
+.bd-md-topbar a,.bd-md-board a { text-decoration: none;}
+.bd-fiddle-toggler{display: block;text-indent: 1em;}
+.clearfix:after{ content:"";height:0;display:block;clear:both; }
+.bd-md-topbar{ position:fixed;top:0;left:0;width:100%;z-index:100 }
+.bd-md-wrap { padding-top:0;background:#37475A;background:-webkit-gradient(linear,left top,left bottom,color-stop(0%,rgba(70,91,116,1.0)),color-stop(100%,rgba(37,45,56,1.0)));background:-moz-linear-gradient(to bottom,rgba(70,91,116,1.0),rgba(37,45,56,1.0));height:36px }
+.bd-md-wrap-inner { background:url(images/mac.png) no-repeat;min-width:250px;background-size:33px 26px;background-position:7px 4px;padding-left:50px }
+.bd-md-head{ color:#fff }
+.bd-md-logo{ libd-height:25px;font-size:14px;padding-top:4px;display:inlibd-block;color:#fff }
+.bd-md-head address {color:#fff;display:inlibd-block;font-size:10px;margin-left:4px}
+.bd-md-head .pull-right{color: #ccc; float: right; padding: 8px 12px 0 0;}
+.bd-md-head .pull-right a{color: #ccc;font-size: 14px;margin-right: 10px;}
+.bd-md-board{bottom:0;left:0;right:0 }
+.bwrap {border-bottom: 1px solid #AAAAAA; box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2); height: 51px;}
+.bd-md-breadcrumb{height:21px;padding:5px 0 0 15px;background:#DEDEDE;background:-webkit-gradient(linear,left top,left bottom,color-stop(0%,rgba(239,239,239,1.0)),color-stop(100%,rgba(204,204,204,1.0)));background:-moz-linear-gradient(to bottom,rgba(239,239,239,1.0),rgba(204,204,204,1.0));border-bottom:1px solid rgba(146,146,146,1.0);color:#666;font-size:12px}
+.bd-md-breadcrumb a{ color:#666; }
+.bd-md-breadcrumb .bd-link{margin-right:10px}
+.bd-md-breadcrumb a:hover{ color:#BB4232 }
+.parame_line input[type='text']{ border:1px solid #ccc;padding:3px;margin:2px 0; }
+.parame_line label{ width:105px;text-align:right;display:inlibd-block; }
+.CodeMirror-wrap pre{ font-size:120%;libd-height:1.1 }
+code{background:#EEEEEE;padding:0 5px;color:#666}
+pre b { color: #a79f4f; font-weight: normal;}
+pre i,pre i *,pre i .d { color: #7bb967; font-style: normal;}
+pre .s {color: #b78e31;}
+pre .d {color: #ff7a5c;}
+pre .c,pre .c * {color: #88c; }
+/*.bd-md-section ul{padding-left:42px;}*/
+.fiddle{ margin-top:10px;visibility:hidden }
+.bd-md-section>ul li,.bd-md-section>ol li{margin-left:1.5em;color:#444;padding:3px 0}
+.bd-md-section ol>li{list-style-type:decimal;}
+.bd-md-section ul.fiddle-nav li{ margin-left:0;padding:5px 9px 7px; }
+.bd-md-section ul.fiddle-nav li.current{ padding:5px 12px 7px; }
+.bd-md-section>ul,.bd-md-section>ol,.bd-md-section p{ margin-bottom:8px }
+.deci{margin-left:2em;padding-left:20px}
+.deci li{list-style-type:decimal}
+.bd-md-menu{ position:fixed;top:61px;left:0;bottom:0;width:22%;overflow-y:scroll;border-right:1px solid #ccc}
+.bd-md-menu h2{ margin-bottom:10px }
+.bd-md-menu-inner{ padding:20px 20px; }
+.bd-md-menu-inner .bd-md-selected{color:#222;font-weight: bold;}
+.bd-md-content{ padding:80px 30px 20px;margin-left:22% }
+.bd-md-menu-inner h2 a {
+    background: url("images/icons.png") no-repeat scroll 0 7px rgba(0, 0, 0, 0);
+    color: #020202;
+    font-size: 20px;
+    font-weight: 400;
+    padding-left: 25px;
+}
+.bd-md-menu-inner ul>li{ color:#42566E;list-style: disc inside none;padding-left:12px; }
+.bd-md-menu-inner li {padding:4px 0 4px 12px;}
+.bd-md-menu-inner li li{ list-style:disc inside }
+.bd-md-menu-inner li li.function{ color:#F2434D }
+.bd-md-menu-inner li ul{ padding-left:16px; }
+.bd-md-menu-inner li a {color: #606060; libd-height: 22px;}
+.bd-md-menu-inner li a.current{color:#4B76A2;font-weight: bold;}
+code .comment{color:#BBBBBB}
+code .keyword,code .attribute{color:#4B86C2}
+code .function,code .title{color:#000080}
+code .string,code .tag{color:#F2434D}
+code .number,.code .value{color:#116644}
+code .params{color:#117700}
+table{ border:2px solid #ccc }
+td{ text-align:center;}
+.bd-md-content .CodeMirror{ font-size:13px; }
+.bd-md-codewrap .CodeMirror{ border:1px solid #ddd;margin:5px 0 10px;font-size:13px; }
+.bd-md-content blockquote{border-radius:4px;-ms-border-radius:4px;-webkit-border-radius:4px;
+    margin: 10px 0;
+    padding: 15px; background-color: #d9edf7;
+    border-color: #bce8f1;
+    color: #31708f; }
+.bd-md-content blockquote p:last-child{margin-bottom:0}
+.demo-codes{ float:left;width:56%;min-height:100px; }
+.demo-preview{ float:right;width:40% }
+.pull-left{ float:left }
+.fiddle-nav li:last-child{ display:none }
+.bd-md-section{ font-size:14px;libd-height:1.6;max-width:1020px;margin:0 auto; }
+.bd-md-section>ul .bd-md-em{color:red}
+.bd-md-section>ul .bd-md-warn{background:#ff7;color:#444;border-bottom:2px}
+.bd-md-section h2{ margin:15px 0 5px; }
+.bd-md-section h3{ font-weight:normal;border-left:5px solid #60738A;padding-left:6px;margin:18px 0 10px; }
+.bd-md-section table{ width:100%;border: 1px solid #d0d0d0;margin:5px 0;border-collapse: collapse; border-spacing: 0;box-sizing: border-box; }
+.bd-md-section table th{ color:#333; text-align: center;}
+.bd-md-section table td{ color:#666;padding:6px 8px;font-size:14px; }
+.bd-md-section thead tr{ background:#F1F1F1; }
+.bd-md-section thead tr td{ color:#333 }
+.bd-md-section tbody tr:nth-child(odd){ background:#FFF; }
+.bd-md-section tbody tr:nth-child(even){ background:#F5F5F5; }
+.bd-md-section tbody td{ border-top:1px solid #ddd; }
+.bd-md-section td+td{ border-left:1px solid #ddd; }
+.bd-md-section dl{ margin:3px 0;color:#444;border:1px solid #d0d0d0;background:#F5F5F5; }
+.bd-md-codewrap textarea,.demo-codes textarea{ opacity:0 }
+.bd-md-section dt{ display:inlibd-block;width:180px;text-align:center;padding:6px 0;float:left; }
+.bd-md-section dd{ display:block;margin-left:190px;border-left:1px solid #ddd;padding:6px 0 6px 10px; }
+.CodeMirror .CodeMirror-scroll{ height:180px; }
+.bd-md-code-compact .CodeMirror .CodeMirror-scroll{ height:50px; }
+
+.bd-md-section table.params td:nth-child(3){ width:70%;text-align:left }
+.bd-md-section table.params thead td:nth-child(3){ text-align:center }
+.bd-md-section .type{ display:inlibd-block;padding:2px 6px;border-radius:3px;-ms-border-radius:3px;-webkit-border-radius:3px;font-size:12px;background:#808080;color:#fff;font-weight: bold; }
+.bd-md-section .type-expression{ color:#fff;background:#800080 }
+.bd-md-section .type-domelement{ color:#fff;background:#5F9EA0 }
+.bd-md-section .type-object{ color:#fff;background:#999999 }
+.bd-md-section .type-function{ color:#fff;background:#008000 }
+.bd-md-section .type-boolean{ color:#fff;background:#128327 }
+.bd-md-section .type-array{ color:#fff;background:#FF9900 }
+.bd-md-section .type-promise{ background:#3A87AD }
+.bd-md-section .type-bdom{ background:#3A87AD }
+.bd-md-section .type-widget{ background:#3A87AD }
+.bd-md-section .type-string{ background:#FF9900 }
+.noselect{ -moz-user-select:none;-webkit-user-select:none;display:inlibd-block;font-size:16px; }
+.bd-markdown-sep{display: block;height:0;position: relative;top:-60px}
+.bd-md-tip{padding:20px 12px;}
+</style>
+</head>
+<body>
+  <div bd-module="/modules/markdown/md.js" bd-state="tip:/modules/markdown/tip.md">
+    <div class="bd-md-topbar">
+      <div class="bd-md-wrap">
+        <div class="bd-md-wrap-inner">
+          <div class="bd-md-head">
+            <a href="/system/wiki/wiki.html" class="bd-md-logo">
+	          <strong bd-html="title||'文档'"></strong>
+            </a>
+            <address>&nbsp;</address>
+            <div class="pull-right">
+              <a bd-repeat="friendLinks" bd-href="{{href}}" target="_blank" bd-html="title"></a>
+              <span style="display:none" bd-show="staff.username">
+                <span class="ng-name">{!{staff.username}}</span>
+                <a bd-click="staff.logout()">退出</a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="bd-md-breadcrumb">
+        <div>
+          <a bd-repeat="breadLinks" bd-href="{{href}}" target="_self" class="bd-link" bd-html="title"></a>
+        </div>
+      </div>
+    </div>
+    <div class="bd-md-board">
+      <div class="bd-md-menu">
+        <div class="bd-md-menu-inner" bd-hide="tip">
+          <h2><a href="#" bd-html="title||'Bowlder文档'"></a></h2>
+          <div bd-html="toc"></div>
+          <ul bd-show="tree" style="display:none">
+            <li bd-repeat="section in tree">
+              <a bd-href="{{section.link}}" target="_self">{{section.title}}</a>
+              <ul bd-if="section.sublist">
+                <li bd-repeat="section.sublist">
+                  <a bd-href="{{link}}" target="_self">{{title}}</a>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+        <pre class="bd-md-tip" style="display:none" bd-show="tip">{{tip}}</pre>
+      </div>
+
+      <div class="bd-md-content">
+        <div class="bd-md-section" bd-role="content"></div>
+      </div>
+    </div>
+  </div>
+  <script src="bowlder.js"></script>
+</body>
+</html>
+

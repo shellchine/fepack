@@ -7,7 +7,8 @@ if(!fs.existsSync(confFile)){
 }
 var conf = require(confFile);
 var Store = require('../lib/store');
-var devHost = (conf.devHost || 'http://127.0.0.1').replace(/\/+$/, '/');
+var $$ = require('../lib/bowlder');
+var devHost = 'http://debug.rongcloud.cn';
 var packDb = new Store(`${conf.cacheDir}/info/jspack.db`, "CREATE TABLE js(name, ver, list, ctime);CREATE INDEX js_name on js(name);CREATE INDEX js_ver on js(ver);CREATE TABLE css(name, ver, list, ctime);CREATE INDEX css_name on css(name);CREATE INDEX css_ver on css(ver);");
 var stmts = {
     findJs: packDb.prepare("select list from js where name=? and ver=?"),
@@ -15,14 +16,15 @@ var stmts = {
 }
 
 async function depackJs(file){
-    if(/(.*?)\.\d+\.js$/.test(file)){
-        file = devHost + RegExp.$1 + ".js";
+    if(/(.*?)\.\w{10}\.js$/.test(file)){
+        file = devHost + '/' + RegExp.$1 + ".js";
+        file = file.replace('desktop-client', '');
         return `document.write("<script src='${file}' charset='utf-8'></script>");`
     }else if(/(.+?)\.(\d{1,5})\.js$/.test(file)){
-        var result = await stmts.findJs.get(RegExp.$1, RegExp.$2);
+        var result = await stmts.findJs.get(RegExp.$1, parseInt(RegExp.$2));
         if(result && result.list){
             return $$.map(result.list.split(/\s+/), js=>{
-                js = devHost + js.replace(/^(http:\/\/.*?\/|\/)/, '');
+                js = devHost + js.replace(/^(http:\/\/.*?\/|\/)/, '').replace('desktop-client', '');
                 return `document.write("<script src='${js}' charset='utf-8'></script>");`
             }).join("\n");
         }
@@ -31,14 +33,15 @@ async function depackJs(file){
 }
 
 async function depackCss(file){
-    if(/(.*?)\.\d+\.css$/.test(file)){
-        file = devHost + RegExp.$1 + ".css";
+    if(/(.*?)\.\w{10}\.css$/.test(file)){
+        file = devHost + '/' + RegExp.$1 + ".css";
+        file = file.replace('desktop-client', '');
         return `@import url(${file});`
     }else if(/(.+?)\.(\d{1,5})\.css$/.test(file)){
-        var result = await stmts.findCss.get(RegExp.$1, RegExp.$2);
+        var result = await stmts.findCss.get(RegExp.$1, parseInt(RegExp.$2));
         if(result && result.list){
             return $$.map(result.list.split(/\s+/), css=>{
-                css = devHost + css.replace(/^(http:\/\/.*?\/|\/)/, '');
+                css = devHost + css.replace(/^(http:\/\/.*?\/|\/)/, '').replace('desktop-client', '');
                 return `@import url(${css});`
             }).join("\n");
         }
@@ -47,7 +50,8 @@ async function depackCss(file){
 }
 
 module.exports = async function(file){
-    var ext = file.extname(file);
+    file = file.replace(/^rce\//, '');
+    var ext = path.extname(file);
     if(ext == '.js'){
         return await depackJs(file);
     }else if(ext == '.css'){

@@ -434,10 +434,10 @@ async function jspack(arr, group, force){
         osize = content.length;
         nsize = fs.statSync(`${jsDir}/${output}`).size;
 
-        stmts.addJs.run(jsVer, files, +new Date);
+        stmts.addJs.run(shortname, jsVer, files, +new Date);
         global.cdnCount ++;
         packedJsUrl = `${vc.cdnBase}${packDir}/${output}`;
-        console.log("新增" + packedJsUrl);
+        console.log("Add: " + packedJsUrl, vc.cdnBase, output);
 
         RESFILES.packFiles[shortname].cdnurl = packedJsUrl;
         RESFILES.packFiles[shortname].md5 = fullmd5;
@@ -514,7 +514,7 @@ async function csspack(arr, group, force){
 
         global.cdnCount ++;
         cssPackedUrl = `${vc.cdnBase}${packDir}/${output}`;
-        console.log("新增"+cssPackedUrl);
+        console.log("Add: "+cssPackedUrl);
 
         RESFILES.packFiles[shortname].cdnurl = cssPackedUrl;
         RESFILES.packFiles[shortname].md5 = fullmd5;

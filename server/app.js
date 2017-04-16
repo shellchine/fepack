@@ -18,6 +18,7 @@ var expressPort = program.port || 8990;
 var app = express();
 app.use(logger('combined'));
 app.use('/gohtml', express.static(__dirname + '/public'));
+app.use('/modules', express.static(__dirname + '/public/modules'));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
@@ -30,15 +31,15 @@ app.all('/go/*', function(req, res, next) {
 
 require('./go')(app);
 
-app.get('/nproxy/:url', function(req, res) {
+app.get('/nproxy', function(req, res) {
     
     (async function(){
         try{
-            var html = await depack(req.params.url);
+            var html = await depack(decodeURIComponent(req.query.url));
         }catch(e){
             return Promise.reject(e);
         }
-        return res.html(html);
+        return res.end(html);
     })().catch(e => {
         console.log(e);
         res.jsonp({

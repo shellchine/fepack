@@ -75,6 +75,7 @@
             break;
         }
         initChgPwd();
+	$(".label-filter-group-container").hide();
         
         function initReport(){ //在Overview页显示html报表
             var $build_cause = $(".build_cause");
@@ -206,7 +207,7 @@
                 scope.addPartner = function(){
                     var newPartner = (scope.newPartner || "").trim();
                     if(!newPartner){
-                        alert("请选择合作者。");
+                        //alert("请选择合作者。");
                         return;
                     }
                     scope.msg.partner = '<img src="http://img2.cache.netease.com/auto/projects/club/v1.1/default/images/loadings.gif">';
@@ -301,7 +302,7 @@
                           <h2 class="entity_title"><%=group.name||group.type%>
                             <span class="quickadd-link" go-show="!groups[<%=i%>].show" go-click="groups[<%=i%>].show=!groups[<%=i%>].show">新建项目</span>
                             <div class="quickadd-form" go-show="groups[<%=i%>].show">代码路径: <input class="vcpath" go-blur="pathBlur(<%=i%>)" go-model="groups[<%=i%>].vcpath"/>
-                              <select go-options="groups[<%=i%>].list" go-model="groups[<%=i%>].dest"><option value=""><%=group.label%></option></select> &nbsp;
+                              <!--select go-options="groups[<%=i%>].list" go-model="groups[<%=i%>].dest"><option value=""><%=group.label%></option></select> &nbsp;-->
                               <input type="submit" class="quickadd-btn" value="新增" go-click="createProject(<%=i%>)" go-show="!groups[<%=i%>].lock">
                               <input type="button" value="取消" class="cancel" go-click="groups[<%=i%>].show=false">
                               <span class="quickadd-msg" go-html="groups[<%=i%>].msg"></span>
@@ -328,20 +329,20 @@
                 var group = scope.groups[i];
                 var url = `${host}/go/create/${group.type}`;
                 
-                var vcpath = (group.vcpath || '').trim().replace(/\\/g, '/').replace(/^\/?(frontend)?\/?/, '');
+                var vcpath = (group.vcpath || '').trim().replace(/^https?:\/\/.*?\//, '').replace(/\\/g, '/').replace(/^\/?(frontend)?\/?/, '');
                 if(!vcpath){
                     return alert("代码路径不能为空");
                 }
-                if(!group.dest){
+                /*if(!group.dest){
                     return alert("请选择发布目标");
-                }
+                }*/
                 
                 group.msg = '<img src="http://img2.cache.netease.com/auto/projects/club/v1.1/default/images/loadings.gif">';
                 group.lock = true;  //隐藏新增按钮
                 $.post(url, {
                     user: user,
                     vcpath: vcpath,
-                    dest: group.dest
+                    dest: group.dest || 1
                 }, function(json){
                     if(json['status'] == 'success'){
                         var name = json['name'];

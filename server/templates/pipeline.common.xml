@@ -15,7 +15,7 @@
         <jobs>
           <job name="publish2static">
             <tasks>
-              <exec command="/var/fepack/script/publish2static" />
+              <exec command="/var/fepack/script/publish2live" />
             </tasks>
             <tabs>
               <tab name="Lint" path="gohtml/dev.html" />
