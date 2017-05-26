@@ -37,7 +37,7 @@ function mirrorDottedDir(ldir, rdir){  //处理带.的文件夹
         var remoteDir = path.resolve(dir.replace(ldir, rdir));
         commands.push(`lcd ${dir}\nmkdir -p ${remoteDir}\ncd ${remoteDir}\nmirror -v -R . .`);
     });
-    if(commands.length < 0){
+    if(commands.length <= 0){
         commands.push("mkdir -p "+rdir);
     }
     return commands.join("\n");

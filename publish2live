@@ -26,7 +26,7 @@ var isLive = /live/i.test(stage);
 var Reporter = require("./lib/reporter");
 var reporter = new Reporter("publish2live", isLive?'live':'dev'+'.html');
 
-process.chdir(isLive ? 'master/': 'qa/');
+//process.chdir(isLive ? 'master/': 'qa/');
 
 var fs = require('fs');
 var request = require('request');
@@ -221,7 +221,7 @@ async function parseSSI(dir){
         if(util.isPreserved(f)){
             return;
         }
-        util.stack("出错文件: " + f);
+        util.stack("Error file: " + f);
         log(f + ":\n");
         var content = readWork(f);
         //inc相对路径当主文件不在根目录时有问题
@@ -248,7 +248,7 @@ async function parseSSI(dir){
 //其它静态资源复制到util.distStaticDirs[i]下
 async function cp4live(){
     // 1a. 更新swf, pdf, css
-    log("[cp4live] 更新可能被js引用的静态资源\n");
+    log("[cp4live] Update res required by js\n");
     await util.wander(function(dir, base){
         return util.isResDir(dir, 1);
     }, async function(file, base){
@@ -264,8 +264,8 @@ async function cp4live(){
     });
     // 1b. 更新swf, pdf, css
     if (distUtils.cdn && conf.cdns[1] && RESFILES.uploadCount[2]) {
-        log(`上传可能被js引用的静态资源到CDN(uploadCount: ${JSON.stringify(RESFILES.uploadCount)})`, 2, 1);
-        var ftpRootDir = (conf.cdns[1].ftpBase || "/f2e") + vc.cdnfix + vc.path;
+        log(`Upload res need by js(uploadCount: ${JSON.stringify(RESFILES.uploadCount)})`, 2, 1);
+        var ftpRootDir = (conf.cdns[1].ftpBase) + vc.cdnfix + vc.path;
         ftp.publish(conf.cdns[1].ftp, distUtils.cdn.mirrorCommand(distStaticDirs[1], ftpRootDir)); //file
     }
     var csscount = RESFILES.uploadCount[1] || 0;
@@ -273,7 +273,7 @@ async function cp4live(){
     upload2ImgCdn();
     util.printTime();
     /// 1c. 更新图片, js, css
-    console.log(`\n[cp4live] 更新所有静态资源(uploadCount: ${JSON.stringify(RESFILES.uploadCount)})\n`);
+    console.log(`\n[cp4live] Update All Statics(uploadCount: ${JSON.stringify(RESFILES.uploadCount)})\n`);
     await util.wander(function(dir, base){
         return util.isResDir(dir, 1);
     }, async function(file, base){
@@ -291,13 +291,17 @@ async function cp4live(){
 
 
 function upload2ImgCdn(clear){
+    console.log("distUtils.cdn", distUtils.cdn);
     if (!distUtils.cdn || !conf.cdns[0]) return;
-    log(`上传到图片CDN(${global.cdnCount} 个文件)`, 2, 1);
+    log(`Upload CDN(${global.cdnCount} Files)`, 2, 1);
     if (global.cdnCount) {
-        log(execSync(`cd ${distStaticDirs[0]};tree 2>/dev/null`));
+        //log(execSync(`cd ${distStaticDirs[0]};tree 2>/dev/null`));
         util.checkNoStatic(distStaticDirs[0]);
-        var ftpRootDir = (conf.cdns[0].ftpBase || "/f2e") + vc.cdnfix + vc.path;
-        ftp.publish(conf.cdns[0].ftp, distUtils.cdn.mirrorCommand(distStaticDirs[0], ftpRootDir));
+	log('mirror:', distStaticDirs[0], ftpRootDir);
+        var ftpRootDir = (conf.cdns[0].ftpBase) + vc.cdnfix + vc.path;
+        var command = distUtils.cdn.mirrorCommand(distStaticDirs[0], ftpRootDir);
+        console.log(command);
+        ftp.publish(conf.cdns[0].ftp, command);
         util.printTime();
         global.cdnCount = 0;
         util.clearFolder(distStaticDirs[0]); //清空

@@ -11,7 +11,7 @@ var log = util.log;
 exports.publish = function(json){
     var [host,remoteDir] = json.base.replace(/\/+$/, '').split(/:/);
     if(!host || !remoteDir) return;
-    var command = `scp -r ${htmlDir} ${json.base};scp -r ${resDir} ${json.base}`;
+    var command = `scp -r ${htmlDir} ${json.base};`;//scp -r ${resDir} ${json.base}`;
     console.log(command);
 //    util.execSync(command);
     log(`SCP到后端服务器`, 2, 1);

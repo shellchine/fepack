@@ -111,7 +111,7 @@ module.exports = function(app){
             });
             return;
 	}
-	vcpath = vcpath.replace(/(\.git)?$/, '.git'); 
+	vcpath = vcpath.replace(/(\.git)?#/, '.git#').replace(/.*:/, ''); 
         if(!fs.existsSync(authFile)){
             res.jsonp({
                 status: "fail",
@@ -119,6 +119,17 @@ module.exports = function(app){
             });
             return;
         }
+        var branch;
+	if(/#(.*)/.test(vcpath)){
+            branch = RegExp.$1
+        }else{
+            res.jsonp({
+                status: "fail",
+                msg: "请用#branch指定分支"
+            });
+            return;
+       }
+	
         var auth = fs.readFileSync(authFile).toString().trim().split(/:/);
         var pipelineFile = `templates/pipeline.${type}.xml`;
         if(!fs.existsSync(pipelineFile)){
@@ -128,13 +139,15 @@ module.exports = function(app){
             });
             return;
         }
-        var project = vcpath.replace(/\/+$/, '').replace(/.*\//, '').replace(/\.git$/, '');  //项目名称
+        var project = vcpath.replace(/.*\//, '').replace(/\.git#/, '-');  //项目名称
+        vcpath = vcpath.replace(/#.*/, '');
+        if(/\.(\w+)$/.test(project)) branch = RegExp.$1;
         var pipelineXml = $$.template.replace(fs.readFileSync(pipelineFile).toString(), {
             name: project,
             vcpath: vcpath,
             dest: dest,
             omad: dest == '-1' ? '1' : '',
-            materials: $$.template.replace(conf.vc.materials, {vcpath:vcpath})
+            materials: $$.template.replace(conf.vc.materials, {vcpath:vcpath, branch:branch})
         }, null, '');
         
         (async function(){
@@ -158,7 +171,7 @@ module.exports = function(app){
                 res.jsonp({
                     status: "success",
                     msg: "添加项目成功",
-                    name:project
+                    name: project
                 });
             }catch(e){
                 res.jsonp({

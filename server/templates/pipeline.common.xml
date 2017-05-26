@@ -10,10 +10,10 @@
       <materials>
         {{materials}}
       </materials>
-      <stage name="devStage">
+      <stage name="distStage">
         <approval type="manual" />
         <jobs>
-          <job name="publish2static">
+          <job name="publish">
             <tasks>
               <exec command="/var/fepack/script/publish2live" />
             </tasks>
@@ -22,22 +22,6 @@
             </tabs>
             <artifacts>
               <artifact src="cruise-output/dev.html" dest="gohtml" />
-            </artifacts>
-          </job>
-        </jobs>
-      </stage>
-      <stage name="publishStage">
-        <approval type="manual" />
-        <jobs>
-          <job name="publish2live">
-            <tasks>
-              <exec command="/var/fepack/script/publish2live" />
-            </tasks>
-            <tabs>
-              <tab name="Files" path="gohtml/live.html" />
-            </tabs>
-            <artifacts>
-              <artifact src="cruise-output/live.html" dest="gohtml" />
             </artifacts>
           </job>
         </jobs>

@@ -9,6 +9,6 @@ module.exports = {
         type: "git",
         host: "http://gitlab.rongcloud.net",
         localhost: "/var/frontend",
-        materials: `<git url="git@gitlab.rongcloud.net:{{vcpath}}" dest="master"/><git url="git@gitlab.rongcloud.net:{{vcpath}}" branch="qa" dest="qa" />`
+        materials: `<git url="git@gitlab.rongcloud.net:{{vcpath}}" branch="{{branch}}"/>`
     }
 }

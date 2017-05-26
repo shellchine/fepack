@@ -2,6 +2,7 @@ var fs = require('fs');
 var path = require('path');
 var proc = require('child_process');
 var ENV = process.env;
+var project = ENV.GO_PIPELINE_NAME;
 
 module.exports = function(git){
 
@@ -31,6 +32,8 @@ module.exports = function(git){
             console.log(`Writer: ${git.writer}`);
         }
     }
+    git.path = project;
+    git.path = git.path.replace(/\./g, '-');
     git.localpath = path.resolve(git.localhost, git.cdnfix+git.path);  //本地仓库目录
     git.publish = {
         dev: function(ver, dir){ //发布未压缩版

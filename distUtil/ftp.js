@@ -20,9 +20,10 @@ exports.publish = function(json){
     var auth = fs.readFileSync(authFile).toString().trim();
     json.base = json.base.replace(/.*?:\/\//, '');
     var ftpHost = json.base.replace(/\/.*/, ''); 
-    var remoteDir = json.base.replace(/\/+$/, '').replace(/.*?\//, '') + "/"+project;
+    var remoteDir = json.base.replace(/\/+$/, '').replace(/.*?\//, '');// + "/"+project;
     var command = `lcd ${htmlDir}\nmkdir -p ${remoteDir}\ncd ${remoteDir}\nmirror -v -R . .\n`;
-    command += `lcd ${resDir}\nmirror -v -R . .`;
+    //command += `lcd ${resDir}\nmirror -v -R . .`;
+    console.log(command);
     log(`FTP到后端服务器.`, 2, 1);
 
     ftp.publish(`${auth}@${ftpHost}`, command);
